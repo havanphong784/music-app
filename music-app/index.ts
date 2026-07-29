@@ -2,6 +2,7 @@ import express from "express";
 import 'dotenv/config'
 import routesV1 from "./src/routes/v1/index.route.js";
 import connectDb from "./src/config/database.config.js";
+import cookieParser from 'cookie-parser';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 await connectDb();
 
 app.use(express.json());
+app.use(cookieParser());
 
 routesV1(app);
 

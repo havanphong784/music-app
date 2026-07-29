@@ -6,14 +6,58 @@ interface IPayload {
     role?: string;
 }
 
-export const generateToken = (payload: IPayload) => {
-    return jwt.sign(payload, process.env.JWT_SECRET as string, {expiresIn: '7d'});
+type TokenType = "access" | "refresh";
+
+interface ITokenPayload extends IPayload, JwtPayload {
+    tokenType: TokenType;
 }
 
-export const verifyToken = (token: string): JwtPayload | null | string => {
+const getSecret = (tokenType: TokenType): string => {
+    const secret = tokenType === "access"
+        ? process.env.JWT_ACCESS_SECRET ?? process.env.JWT_SECRET
+        : process.env.JWT_REFRESH_SECRET ?? process.env.JWT_SECRET;
+
+    if (!secret) {
+        throw new Error(`Thiếu JWT_${tokenType.toUpperCase()}_SECRET hoặc JWT_SECRET`);
+    }
+
+    return secret;
+}
+
+export const generateRefreshToken = (payload: IPayload) => {
+    return jwt.sign(
+        {...payload, tokenType: "refresh"},
+        getSecret("refresh"),
+        {expiresIn: "7d"}
+    );
+}
+
+export const generateAcceptToken = (payload: IPayload) => {
+    return jwt.sign(
+        {...payload, tokenType: "access"},
+        getSecret("access"),
+        {expiresIn: "15m"}
+    );
+}
+
+const verifyToken = (token: string, tokenType: TokenType): ITokenPayload | null => {
     try {
-        return jwt.verify(token, process.env.JWT_SECRET as string);
-    } catch (err) {
+        const payload = jwt.verify(token, getSecret(tokenType));
+
+        if (
+            typeof payload === "string" ||
+            payload.tokenType !== tokenType ||
+            typeof payload.userId !== "string"
+        ) {
+            return null;
+        }
+
+        return payload as ITokenPayload;
+    } catch {
         return null;
     }
 }
+
+export const verifyAccessToken = (token: string) => verifyToken(token, "access");
+
+export const verifyRefreshToken = (token: string) => verifyToken(token, "refresh");
