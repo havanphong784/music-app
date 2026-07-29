@@ -1,7 +1,7 @@
 import express from "express";
 import 'dotenv/config'
-import routesV1 from "./src/routes/v1/index.route.js";
-import connectDb from "./src/config/database.config.js";
+import routesV1 from "./routes/v1/index.route.js";
+import connectDb from "./config/database.config.js";
 import cookieParser from 'cookie-parser';
 
 const app = express();

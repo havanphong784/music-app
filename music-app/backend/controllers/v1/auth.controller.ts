@@ -92,3 +92,15 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
     });
     res.status(200).json({accessToken});
 }
+
+export const logout = async (req: Request, res: Response): Promise<void> => {
+    const refreshToken = req.cookies.refreshToken;
+
+    if (refreshToken) {
+        await RefreshToken.deleteOne({token: refreshToken});
+    }
+
+    res.clearCookie("refreshToken");
+
+    res.status(200).json({message: "Đăng xuất thành công."});
+}
