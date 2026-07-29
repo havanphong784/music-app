@@ -1,9 +1,14 @@
 import express from "express";
 import 'dotenv/config'
-import routesV1 from "./src/api/v1/routes/index.route.js";
+import routesV1 from "./src/routes/v1/index.route.js";
+import connectDb from "./src/config/database.config.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+await connectDb();
+
+app.use(express.json());
 
 routesV1(app);
 
