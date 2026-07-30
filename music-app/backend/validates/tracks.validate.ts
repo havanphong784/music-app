@@ -23,3 +23,21 @@ export const createTrackValidate = (req: Request, res: Response, next: NextFunct
 
     next();
 }
+
+export const patchTrackValidate = (req: Request, res: Response, next: NextFunction) => {
+    const {title, genre} = req.body;
+
+    if (title !== undefined && (!title || !title.trim())) {
+        return res.status(400).json({
+            message: "Tiêu đề bài hát không được để trống",
+        });
+    }
+
+    if (genre !== undefined && (!genre || !genre.trim())) {
+        return res.status(400).json({
+            message: "Thể loại bài hát không được để trống",
+        });
+    }
+
+    next();
+};

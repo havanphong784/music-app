@@ -1,10 +1,10 @@
-import mongoose, {Document, Model, Schema} from "mongoose";
+import mongoose, {Schema} from "mongoose";
 // @ts-ignore
 import slug from 'mongoose-slug-updater';
 
 mongoose.plugin(slug);
 
-export interface ITrack extends Document {
+export interface ITrack {
     title: string;
     slug: string;
     description?: string;
@@ -42,6 +42,6 @@ const trackSchema = new Schema<ITrack>(
     {timestamps: true}
 );
 
-const Track: Model<ITrack> = mongoose.model<ITrack>("Track", trackSchema);
+const Track = mongoose.model<ITrack>("Track", trackSchema);
 
 export default Track;
