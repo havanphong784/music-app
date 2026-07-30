@@ -6,7 +6,8 @@ import {uploadMultipleFiles, uploadToCloudinaryMultiple} from "../../middlewares
 import {createTrackValidate} from "../../validates/tracks.validate.js";
 
 const router = express.Router();
-router.post("/tracks",
+
+router.post("/",
     requireAuth,
     uploadMultipleFiles.fields([
         {name: 'avatar', maxCount: 1},
@@ -17,5 +18,6 @@ router.post("/tracks",
     uploadToCloudinaryMultiple,
     controller.tracksPost
 );
+router.get("/:trackId", controller.getTrackId);
 
 export default router;

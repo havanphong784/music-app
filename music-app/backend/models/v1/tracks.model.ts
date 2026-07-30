@@ -1,7 +1,12 @@
 import mongoose, {Document, Model, Schema} from "mongoose";
+// @ts-ignore
+import slug from 'mongoose-slug-updater';
+
+mongoose.plugin(slug);
 
 export interface ITrack extends Document {
     title: string;
+    slug: string;
     description?: string;
     audioUrl: string;
     coverImageUrl?: string;
@@ -18,6 +23,7 @@ export interface ITrack extends Document {
 const trackSchema = new Schema<ITrack>(
     {
         title: {type: String, required: true, trim: true},
+        slug: {type: String, slug: "title", unique: true},
         description: {type: String, default: ""},
         audioUrl: {type: String, required: true},
         coverImageUrl: {type: String, default: ""},

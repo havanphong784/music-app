@@ -5,7 +5,7 @@ import tracksRoute from "./tracks.route.js";
 const prefixRoutes: string = "/api/v1"
 const routesV1 = (app: Express): void => {
     app.use(prefixRoutes + "/auth", authRoute);
-    app.use(prefixRoutes, tracksRoute);
+    app.use(prefixRoutes + "/tracks", tracksRoute);
 }
 
 export default routesV1;
