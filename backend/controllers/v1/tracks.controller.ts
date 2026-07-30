@@ -54,7 +54,7 @@ export const tracksGet = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-export const tracksPost = async (req: Request, res: Response) => {
+export const tracksPost = async (req: Request, res: Response): Promise<void> => {
     try {
         const {
             title,
@@ -96,7 +96,7 @@ export const tracksPost = async (req: Request, res: Response) => {
     }
 }
 
-export const getTrackId = async (req: Request, res: Response) => {
+export const getTrackId = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = req.params.trackId;
         const track = await Track.findById(id);
@@ -118,7 +118,7 @@ export const getTrackId = async (req: Request, res: Response) => {
     }
 }
 
-export const patchTrackId = async (req: Request, res: Response) => {
+export const patchTrackId = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = req.params.trackId;
         const track = await Track.findById(id);
@@ -182,7 +182,7 @@ export const patchTrackId = async (req: Request, res: Response) => {
     }
 };
 
-export const deleteTrack = async (req: Request, res: Response) => {
+export const deleteTrack = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = req.params.trackId;
         const track = await Track.findById(id);
@@ -262,3 +262,37 @@ export const getTrackStream = async (req: Request, res: Response): Promise<void>
         });
     }
 };
+
+export const postTrackPlay = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const track = await Track.findByIdAndUpdate(req.params.trackId, {$inc: {playCount: 1}}, {
+            new: true,
+            runValidators: true
+        }).select("_id playCount");
+        if (!track) {
+            res.status(404).json({
+                message: "Bài hát không tồn tại."
+            });
+            return;
+        }
+        res.status(200).json({
+            message: "Ghi nhận lượt nghe thành công.",
+            data: {
+                trackId: track._id,
+                playCount: track.playCount
+            }
+        });
+    } catch (err: any) {
+        if (err.name === "CastError") {
+            res.status(400).json({
+                message: "Id bài hát không hợp lệ."
+            });
+            return;
+        }
+        res.status(500).json({
+            message: "Lỗi ghi nhận lượt nghe.",
+            error: err.message
+        });
+    }
+};
+
