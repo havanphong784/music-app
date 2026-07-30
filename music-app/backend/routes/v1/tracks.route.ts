@@ -30,5 +30,6 @@ router.patch("/:trackId",
     uploadToCloudinaryMultiple,
     controller.patchTrackId
 );
+router.delete("/:trackId", requireAuth, controller.deleteTrack);
 
 export default router;

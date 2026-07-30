@@ -100,3 +100,40 @@ export const patchTrackId = async (req: Request, res: Response) => {
         });
     }
 };
+
+export const deleteTrack = async (req: Request, res: Response) => {
+    try {
+        const id = req.params.trackId;
+        const track = await Track.findById(id);
+        if (!track) {
+            res.status(404).json({
+                message: "Bài hát không tồn tại."
+            });
+            return;
+        }
+
+        const currentUserId = (req as any).user?.userId;
+        if (track.artist.toString() !== currentUserId) {
+            res.status(403).json({
+                message: "Không có quyền xóa bài hát này."
+            });
+            return;
+        }
+
+        await Track.deleteOne({_id: id});
+        res.status(200).json({
+            message: "Xóa bài hát thành công."
+        });
+    } catch (err: any) {
+        if (err.name === "CastError") {
+            res.status(400).json({
+                message: "Id bài hát không hợp lệ."
+            });
+            return;
+        }
+        res.status(500).json({
+            message: "Lỗi xóa bài hát",
+            error: err.message
+        });
+    }
+};
