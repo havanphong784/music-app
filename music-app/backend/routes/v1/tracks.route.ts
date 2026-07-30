@@ -6,7 +6,7 @@ import {uploadMultipleFiles, uploadToCloudinaryMultiple} from "../../middlewares
 import {createTrackValidate, patchTrackValidate} from "../../validates/tracks.validate.js";
 
 const router = express.Router();
-
+router.get("/", controller.tracksGet);
 router.post("/",
     requireAuth,
     uploadMultipleFiles.fields([

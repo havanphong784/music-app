@@ -1,6 +1,58 @@
 import {Request, Response} from "express";
 import Track, {ITrack} from "../../models/v1/tracks.model.js";
 
+export const tracksGet = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const {sortKey, sortValue, keyword, genre, page, limit} = req.query;
+
+        const find: Record<string, any> = {};
+
+        if (keyword && typeof keyword === "string" && keyword.trim() !== "") {
+            find.title = new RegExp(keyword, "i");
+        }
+
+        if (genre && typeof genre === "string" && genre.trim() !== "") {
+            find.genre = genre.trim().toLowerCase();
+        }
+
+        const sort: Record<string, 1 | -1> = {};
+        if (sortKey && typeof sortKey === "string") {
+            const isAsc = sortValue === "asc" || sortValue === "1";
+            sort[sortKey] = isAsc ? 1 : -1;
+        } else {
+            sort.createdAt = -1;
+        }
+
+        const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
+        const limitNum = Math.max(1, parseInt(limit as string, 10) || 20);
+        const skip = (pageNum - 1) * limitNum;
+
+        const totalCount = await Track.countDocuments(find);
+        const totalPages = Math.ceil(totalCount / limitNum);
+
+        const tracks = await Track.find(find)
+            .sort(sort)
+            .skip(skip)
+            .limit(limitNum);
+
+        res.status(200).json({
+            message: "Lấy danh sách bài hát thành công.",
+            data: tracks,
+            pagination: {
+                currentPage: pageNum,
+                limit: limitNum,
+                totalCount,
+                totalPages
+            }
+        });
+    } catch (err: any) {
+        res.status(500).json({
+            message: "Lỗi lấy danh sách bài hát",
+            error: err.message
+        });
+    }
+};
+
 export const tracksPost = async (req: Request, res: Response) => {
     try {
         const {title, description, genre, audioUrl, avatarUrl, lyricsUrl, audioDuration} = req.body;
