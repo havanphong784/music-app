@@ -12,5 +12,9 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     if (!payload) {
         return res.status(403).json({ message: 'Access Token không hợp lệ hoặc đã hết hạn' });
     }
+    
+    // Lưu thông tin payload vào req để các controller phía sau sử dụng
+    (req as any).user = payload;
+    
     next();
 }
