@@ -1,5 +1,6 @@
 import {Request, Response} from "express";
 import Track, {ITrack} from "../../models/v1/tracks.model.js";
+import cloudinaryConfig from "../../config/cloudinary.config.js";
 
 export const tracksGet = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -55,14 +56,28 @@ export const tracksGet = async (req: Request, res: Response): Promise<void> => {
 
 export const tracksPost = async (req: Request, res: Response) => {
     try {
-        const {title, description, genre, audioUrl, avatarUrl, lyricsUrl, audioDuration} = req.body;
+        const {
+            title,
+            description,
+            genre,
+            audioUrl,
+            audioPublicId,
+            avatarUrl,
+            avatarPublicId,
+            lyricsUrl,
+            lyricsPublicId,
+            audioDuration
+        } = req.body;
         const trackData = {
             title,
             description,
             genre,
             audioUrl,
+            audioPublicId,
             coverImageUrl: avatarUrl,
+            coverImagePublicId: avatarPublicId,
             lyricsUrl,
+            lyricsPublicId,
             duration: audioDuration,
             artist: (req as any).user?.userId
         };
@@ -123,15 +138,29 @@ export const patchTrackId = async (req: Request, res: Response) => {
             return;
         }
 
-        const {title, description, genre, audioUrl, avatarUrl, lyricsUrl, audioDuration} = req.body;
+        const {
+            title,
+            description,
+            genre,
+            audioUrl,
+            audioPublicId,
+            avatarUrl,
+            avatarPublicId,
+            lyricsUrl,
+            lyricsPublicId,
+            audioDuration
+        } = req.body;
         const updateData: Partial<ITrack> = {};
 
         if (title !== undefined) updateData.title = title.trim();
         if (description !== undefined) updateData.description = description;
         if (genre !== undefined) updateData.genre = genre.trim().toLowerCase();
         if (audioUrl !== undefined) updateData.audioUrl = audioUrl;
+        if (audioPublicId !== undefined) updateData.audioPublicId = audioPublicId;
         if (avatarUrl !== undefined) updateData.coverImageUrl = avatarUrl;
+        if (avatarPublicId !== undefined) updateData.coverImagePublicId = avatarPublicId;
         if (lyricsUrl !== undefined) updateData.lyricsUrl = lyricsUrl;
+        if (lyricsPublicId !== undefined) updateData.lyricsPublicId = lyricsPublicId;
         if (audioDuration !== undefined) updateData.duration = audioDuration;
 
         await Track.updateOne({_id: id}, updateData);
@@ -185,6 +214,49 @@ export const deleteTrack = async (req: Request, res: Response) => {
         }
         res.status(500).json({
             message: "Lỗi xóa bài hát",
+            error: err.message
+        });
+    }
+};
+
+export const getTrackStream = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const id = req.params.trackId;
+        const track = await Track.findById(id);
+        if (!track) {
+            res.status(404).json({
+                message: "Bài hát không tồn tại."
+            });
+            return;
+        }
+
+        if (!track.audioPublicId) {
+            res.status(400).json({
+                message: "Bài hát chưa có ID âm thanh trên cloud (audioPublicId)."
+            });
+            return;
+        }
+
+        const streamUrl = cloudinaryConfig.url(track.audioPublicId, {
+            resource_type: 'video',
+            sign_url: true,
+            to_type: 'authenticated',
+            expires_at: Math.floor(Date.now() / 1000) + 60 * 5 // 5 phút
+        });
+
+        res.status(200).json({
+            message: "Lấy stream track thành công.",
+            streamUrl
+        });
+    } catch (err: any) {
+        if (err.name === "CastError") {
+            res.status(400).json({
+                message: "Id bài hát không hợp lệ."
+            });
+            return;
+        }
+        res.status(500).json({
+            message: "Lỗi khi lấy stream.",
             error: err.message
         });
     }

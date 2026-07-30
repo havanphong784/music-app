@@ -55,6 +55,7 @@ export const uploadToCloudinaryMultiple = async (req: Request, res: Response, ne
             const uploadTask = streamUpload(file.buffer, `music-app/${fieldName}`, resourceType)
                 .then((result) => {
                     uploadResults[`${fieldName}Url`] = result.secure_url;
+                    uploadResults[`${fieldName}PublicId`] = result.public_id;
 
                     if (fieldName === 'audio') {
                         uploadResults[`audioDuration`] = result.duration;

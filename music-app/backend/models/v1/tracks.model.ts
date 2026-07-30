@@ -9,8 +9,11 @@ export interface ITrack {
     slug: string;
     description?: string;
     audioUrl: string;
+    audioPublicId?: string;
     coverImageUrl?: string;
+    coverImagePublicId?: string;
     lyricsUrl?: string;
+    lyricsPublicId?: string;
     duration: number;
     genre: string;
     artist: string;
@@ -26,8 +29,11 @@ const trackSchema = new Schema<ITrack>(
         slug: {type: String, slug: "title", unique: true},
         description: {type: String, default: ""},
         audioUrl: {type: String, required: true},
+        audioPublicId: {type: String, default: ""},
         coverImageUrl: {type: String, default: ""},
+        coverImagePublicId: {type: String, default: ""},
         lyricsUrl: {type: String, default: ""},
+        lyricsPublicId: {type: String, default: ""},
         duration: {type: Number, required: true},
         genre: {type: String, required: true, lowercase: true, index: true},
         artist: {

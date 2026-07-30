@@ -31,5 +31,6 @@ router.patch("/:trackId",
     controller.patchTrackId
 );
 router.delete("/:trackId", requireAuth, controller.deleteTrack);
+router.get("/:trackId/stream", controller.getTrackStream);
 
 export default router;
