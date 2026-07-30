@@ -8,7 +8,7 @@ export interface ITrack {
     title: string;
     slug: string;
     description?: string;
-    audioUrl: string;
+    audioUrl?: string;
     audioPublicId?: string;
     coverImageUrl?: string;
     coverImagePublicId?: string;
@@ -28,7 +28,7 @@ const trackSchema = new Schema<ITrack>(
         title: {type: String, required: true, trim: true},
         slug: {type: String, slug: "title", unique: true},
         description: {type: String, default: ""},
-        audioUrl: {type: String, required: true},
+        audioUrl: {type: String, default: ""},
         audioPublicId: {type: String, default: ""},
         coverImageUrl: {type: String, default: ""},
         coverImagePublicId: {type: String, default: ""},

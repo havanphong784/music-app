@@ -21,10 +21,15 @@ export const uploadMultipleFiles = multer({
     },
 });
 
-const streamUpload = (fileBuffer: Buffer, folder: string, resourceType: "auto" | "video" | "image" | "raw" = "auto"): Promise<any> => {
+const streamUpload = (
+    fileBuffer: Buffer,
+    folder: string,
+    resourceType: "auto" | "video" | "image" | "raw" = "auto",
+    type: "upload" | "authenticated" | "private" = "upload"
+): Promise<any> => {
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-            {folder, resource_type: resourceType},
+            {folder, resource_type: resourceType, type},
             (error: any, result: any) => {
                 if (result) resolve(result);
                 else reject(error);
@@ -48,13 +53,20 @@ export const uploadToCloudinaryMultiple = async (req: Request, res: Response, ne
         for (const fieldName in files) {
             const file = files[fieldName][0];
             let resourceType: "auto" | "video" | "image" | "raw" = "auto";
-            if (fieldName === 'audio') resourceType = 'video';
+            let accessType: "upload" | "authenticated" | "private" = "upload";
+
+            if (fieldName === 'audio') {
+                resourceType = 'video';
+                accessType = 'authenticated';
+            }
             if (fieldName === 'avatar') resourceType = 'image';
             if (fieldName === 'lyrics') resourceType = 'raw';
 
-            const uploadTask = streamUpload(file.buffer, `music-app/${fieldName}`, resourceType)
+            const uploadTask = streamUpload(file.buffer, `music-app/${fieldName}`, resourceType, accessType)
                 .then((result) => {
-                    uploadResults[`${fieldName}Url`] = result.secure_url;
+                    if (fieldName !== 'audio') {
+                        uploadResults[`${fieldName}Url`] = result.secure_url;
+                    }
                     uploadResults[`${fieldName}PublicId`] = result.public_id;
 
                     if (fieldName === 'audio') {

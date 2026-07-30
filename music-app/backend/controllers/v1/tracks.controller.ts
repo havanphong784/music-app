@@ -237,16 +237,17 @@ export const getTrackStream = async (req: Request, res: Response): Promise<void>
             return;
         }
 
-        const streamUrl = cloudinaryConfig.url(track.audioPublicId, {
+        const expiresAt = Math.floor(Date.now() / 1000) + 60 * 5; // 5 phút
+        const streamUrl = cloudinaryConfig.utils.private_download_url(track.audioPublicId, '', {
             resource_type: 'video',
-            sign_url: true,
-            to_type: 'authenticated',
-            expires_at: Math.floor(Date.now() / 1000) + 60 * 5 // 5 phút
+            type: 'authenticated',
+            expires_at: expiresAt
         });
 
         res.status(200).json({
             message: "Lấy stream track thành công.",
-            streamUrl
+            streamUrl,
+            expiresAt
         });
     } catch (err: any) {
         if (err.name === "CastError") {
