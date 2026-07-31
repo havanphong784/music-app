@@ -32,6 +32,7 @@ router.patch("/:trackId",
 );
 router.delete("/:trackId", requireAuth, controller.deleteTrack);
 router.get("/:trackId/stream", controller.getTrackStream);
-router.post("/:trackId/plays",controller.postTrackPlay)
+router.post("/:trackId/plays", controller.postTrackPlay);
+router.post("/:trackId/comment", requireAuth, controller.postTrackComment);
 
 export default router;

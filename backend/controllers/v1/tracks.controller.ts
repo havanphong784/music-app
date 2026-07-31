@@ -1,5 +1,6 @@
 import {Request, Response} from "express";
 import Track, {ITrack} from "../../models/v1/tracks.model.js";
+import Comment from "../../models/v1/comment.model.js";
 import cloudinaryConfig from "../../config/cloudinary.config.js";
 
 export const tracksGet = async (req: Request, res: Response): Promise<void> => {
@@ -291,6 +292,59 @@ export const postTrackPlay = async (req: Request, res: Response): Promise<void> 
         }
         res.status(500).json({
             message: "Lỗi ghi nhận lượt nghe.",
+            error: err.message
+        });
+    }
+};
+
+export const postTrackComment = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const {content, parentId} = req.body;
+        if (!content || content.trim() === "") {
+            res.status(400).json({
+                message: "Bình luận không được để trống"
+            });
+            return;
+        }
+        const id = req.params.trackId;
+        const track = await Track.findById(id);
+        if (!track) {
+            res.status(404).json({
+                message: "Bài hát không tồn tại."
+            });
+            return;
+        }
+
+        const userId = (req as any).user?.userId;
+        if (!userId) {
+            res.status(401).json({
+                message: "Bạn chưa đăng nhập."
+            });
+            return;
+        }
+
+        const comment = new Comment({
+            userId: userId,
+            parentId: parentId,
+            trackId: id,
+            content: content.trim()
+        });
+
+        await comment.save();
+
+        res.status(201).json({
+            message: "Gửi bình luận thành công.",
+            data: comment
+        });
+    } catch (err: any) {
+        if (err.name === "CastError") {
+            res.status(400).json({
+                message: "Id bài hát không hợp lệ."
+            });
+            return;
+        }
+        res.status(500).json({
+            message: "Lỗi gửi comment",
             error: err.message
         });
     }
