@@ -350,3 +350,32 @@ export const postTrackComment = async (req: Request, res: Response): Promise<voi
     }
 };
 
+export const getTrackComment = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const id = req.params.trackId;
+        const track = await Track.findById(id);
+        if (!track) {
+            res.status(404).json({
+                message: "Bài hát không tồn tại."
+            });
+            return;
+        }
+        const comments = await Comment.find({trackId: id}).sort({createdAt: -1});
+        res.status(200).json({
+            message: "Lấy danh sách bình luận thành công.",
+            data: comments
+        });
+    } catch (err: any) {
+        if (err.name === "CastError") {
+            res.status(400).json({
+                message: "Id bài hát không hợp lệ."
+            });
+            return;
+        }
+        res.status(500).json({
+            message: "Lỗi lấy danh sách bình luận.",
+            error: err.message
+        });
+    }
+};
+

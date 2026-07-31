@@ -11,6 +11,7 @@ const commentSchema = new mongoose.Schema<IComment>({
     trackId: {
         type: String,
         required: true,
+        index: true,
     },
     userId: {
         type: String,

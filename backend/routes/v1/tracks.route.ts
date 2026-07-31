@@ -4,6 +4,7 @@ import {requireAuth} from "../../middlewares/v1/auth.middleware.js";
 import {uploadMultipleFiles, uploadToCloudinaryMultiple} from "../../middlewares/v1/upload.middleware.js";
 
 import {createTrackValidate, patchTrackValidate} from "../../validates/tracks.validate.js";
+import {getTrackComment} from "../../controllers/v1/tracks.controller.js";
 
 const router = express.Router();
 router.get("/", controller.tracksGet);
@@ -34,5 +35,6 @@ router.delete("/:trackId", requireAuth, controller.deleteTrack);
 router.get("/:trackId/stream", controller.getTrackStream);
 router.post("/:trackId/plays", controller.postTrackPlay);
 router.post("/:trackId/comment", requireAuth, controller.postTrackComment);
+router.get("/:trackId/comment", controller.getTrackComment);
 
 export default router;
