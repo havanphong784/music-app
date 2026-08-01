@@ -3,6 +3,7 @@ import {useEffect, useState} from "react";
 import {login as loginApi} from "../../services/auth.ts";
 import {useAuth} from "../../context/AuthContext.tsx";
 import {useNavigate} from "react-router-dom";
+import {Button} from "@/components/ui/button.tsx";
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -54,12 +55,12 @@ export default function LoginPage() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPass(e.target.value)}
                 required
             />
-            <button type="submit" disabled={loading}>
+            <Button type="submit" loading={loading}>
                 {loading ? "Đang đăng nhập..." : "Login"}
-            </button>
-            <button type="button" onClick={handleLogout}>
+            </Button>
+            <Button type="button" onClick={handleLogout}>
                 Logout
-            </button>
+            </Button>
             {message && <label>{message}</label>}
         </form>
     );
