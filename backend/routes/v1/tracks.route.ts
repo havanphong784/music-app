@@ -2,9 +2,7 @@ import express from "express";
 import * as controller from "../../controllers/v1/tracks.controller.js"
 import {requireAuth} from "../../middlewares/v1/auth.middleware.js";
 import {uploadMultipleFiles, uploadToCloudinaryMultiple} from "../../middlewares/v1/upload.middleware.js";
-
 import {createTrackValidate, patchTrackValidate} from "../../validates/tracks.validate.js";
-import {getTrackComment} from "../../controllers/v1/tracks.controller.js";
 
 const router = express.Router();
 router.get("/", controller.tracksGet);

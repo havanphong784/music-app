@@ -1,4 +1,5 @@
 import jwt, {JwtPayload} from 'jsonwebtoken';
+import {randomUUID} from 'node:crypto';
 
 export interface IPayload {
     userId: string;
@@ -28,7 +29,7 @@ export const generateRefreshToken = (payload: IPayload) => {
     return jwt.sign(
         {...payload, tokenType: "refresh"},
         getSecret("refresh"),
-        {expiresIn: "7d"}
+        {expiresIn: "7d", jwtid: randomUUID()}
     );
 }
 

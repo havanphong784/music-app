@@ -2,30 +2,32 @@ import {NextFunction, Request, Response} from "express";
 
 export const register = (req: Request, res: Response, next: NextFunction) => {
     const {name, email, password} = req.body;
-    if (!name || !email || !password || !name.length) {
+    if (
+        typeof name !== "string" || !name.trim() ||
+        typeof email !== "string" || !email.trim() ||
+        typeof password !== "string"
+    ) {
         return res.status(400).json({
             message: "Thiếu thông tin",
         })
     }
-    if (password.length < 8) {
+    if (password.length < 8 || password.length > 128) {
         return res.status(400).json({
-            message: "Mật khẩu tối thiểu 8 kí tự",
+            message: "Mật khẩu phải từ 8 đến 128 kí tự",
         })
     }
+    req.body.name = name.trim();
+    req.body.email = email.trim().toLowerCase();
     next();
 }
 
 export const login = (req: Request, res: Response, next: NextFunction) => {
     const {email, password} = req.body;
-    if (!email || !password) {
+    if (typeof email !== "string" || !email.trim() || typeof password !== "string" || !password) {
         return res.status(400).json({
-            message: "Thiếu thông tin",
+            message: "Thiếu email hoặc mật khẩu",
         })
     }
-    if (password.length < 8) {
-        return res.status(400).json({
-            message: "Mật khẩu tối thiểu 8 kí tự",
-        })
-    }
+    req.body.email = email.trim().toLowerCase();
     next();
 }

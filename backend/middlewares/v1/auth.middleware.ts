@@ -10,7 +10,7 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     const token = authHeader.slice(7);
     const payload = verifyAccessToken(token);
     if (!payload) {
-        return res.status(403).json({message: 'Access Token không hợp lệ hoặc đã hết hạn'});
+        return res.status(401).json({message: 'Access Token không hợp lệ hoặc đã hết hạn'});
     }
 
     (req as any).user = payload;
