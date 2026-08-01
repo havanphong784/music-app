@@ -1,5 +1,6 @@
 import AuthLayout from "../layouts/AuthLayout.tsx";
 import LoginPage from "../pages/auth/LoginPage.tsx";
+import RegisterPage from "../pages/auth/RegisterPage.tsx";
 
 export const routes = [
     {
@@ -14,7 +15,8 @@ export const routes = [
                 element: <LoginPage/>
             },
             {
-                path: "register"
+                path: "register",
+                element: <RegisterPage/>
             }
         ]
     }
