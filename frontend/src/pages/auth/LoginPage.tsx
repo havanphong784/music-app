@@ -40,7 +40,7 @@ export default function LoginPage() {
     }
 
     return (
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleLogin} className="bg-background text-foreground">
             <input
                 type="email"
                 placeholder="Email"

@@ -10,14 +10,14 @@ export interface AuthContextType {
     handleRefreshToken: () => Promise<void>;
 }
 
-interface AuthProviderProps {
+export interface ProviderProps {
     children: ReactNode;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({children}) => {
+export const AuthProvider: React.FC<ProviderProps> = ({children}) => {
     const [user, setUser] = useState<User | null>(null);
     const [accessToken, setAccessToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
