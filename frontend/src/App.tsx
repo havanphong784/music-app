@@ -1,9 +1,12 @@
-import './styles/index.css'
+import './styles/index.css';
+import {useRoutes} from "react-router-dom";
+import {routes} from "./routes";
 
 export default function App() {
-    return <>
-        <h1 className="bg-amber-500">
-            App
-        </h1>
-    </>
+    const element = useRoutes(routes);
+    return (
+        <>
+            {element}
+        </>
+    );
 }
