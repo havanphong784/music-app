@@ -429,3 +429,51 @@ export const postTrackLike = async (req: Request, res: Response): Promise<void> 
 };
 
 
+export const deleteTrackLike = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const trackId = req.params.trackId;
+        const userId = req.user.userId;
+
+        if (!userId) {
+            res.status(401).json({
+                message: "Bạn chưa đăng nhập."
+            });
+            return;
+        }
+
+        const trackStored = await Track.findById(trackId);
+        if (!trackStored) {
+            res.status(404).json({
+                message: "Bài hát không tồn tại."
+            });
+            return;
+        }
+
+        const like = await Like.findOne({trackId: trackId, userId: userId});
+        if (!like) {
+            res.status(400).json({
+                message: "Bạn chưa like bài hát này."
+            });
+            return;
+        }
+
+        await Like.findByIdAndDelete(like._id);
+        const updatedLikeCount = Math.max(0, trackStored.likeCount - 1);
+        await Track.findByIdAndUpdate(trackId, {likeCount: updatedLikeCount});
+
+        res.status(200).json({
+            message: "Đã hủy like thành công."
+        });
+    } catch (e: any) {
+        if (e.name === "CastError") {
+            res.status(400).json({
+                message: "Id bài hát không hợp lệ."
+            });
+            return;
+        }
+        res.status(500).json({
+            message: "Lỗi khi hủy like.",
+            error: e.message
+        });
+    }
+};

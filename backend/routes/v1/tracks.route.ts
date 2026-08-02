@@ -35,5 +35,6 @@ router.post("/:trackId/plays", controller.postTrackPlay);
 router.post("/:trackId/comment", requireAuth, controller.postTrackComment);
 router.get("/:trackId/comment", controller.getTrackComment);
 router.post("/:trackId/like", requireAuth, controller.postTrackLike);
+router.delete("/:trackId/like", requireAuth, controller.deleteTrackLike);
 
 export default router;
