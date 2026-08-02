@@ -2,6 +2,7 @@ import {Request, Response} from "express";
 import Track, {ITrack} from "../../models/v1/tracks.model.js";
 import Comment from "../../models/v1/comment.model.js";
 import cloudinaryConfig from "../../config/cloudinary.config.js";
+import {Like} from "../../models/v1/like.model.js";
 
 export const tracksGet = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -378,4 +379,53 @@ export const getTrackComment = async (req: Request, res: Response): Promise<void
         });
     }
 };
+
+export const postTrackLike = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const trackId = req.params.trackId;
+        const userId = req.user.userId;
+
+        const trackStore = await Track.findById(trackId);
+        if (!trackStore) {
+            res.status(404).json({
+                message: "Bài hát không tồn tại."
+            });
+            return;
+        }
+
+        const like = await Like.findOne({
+            userId: userId,
+            trackId: trackId
+        });
+
+        if (like) {
+            res.status(200).json({
+                message: "Bạn đã like bài hát này rồi."
+            });
+            return;
+        }
+
+        const newLike = new Like({userId, trackId});
+        await newLike.save();
+
+        await Track.findByIdAndUpdate(trackId, {$inc: {likeCount: 1}});
+
+        res.status(200).json({
+            message: "Like bài hát thành công.",
+            data: newLike,
+        });
+    } catch (err: any) {
+        if (err.name === "CastError") {
+            res.status(400).json({
+                message: "Id bài hát không hợp lệ."
+            });
+            return;
+        }
+        res.status(500).json({
+            message: "Lỗi khi like bài hát.",
+            error: err.message
+        });
+    }
+};
+
 
