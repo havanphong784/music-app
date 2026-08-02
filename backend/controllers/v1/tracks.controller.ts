@@ -204,6 +204,7 @@ export const deleteTrack = async (req: Request, res: Response): Promise<void> =>
         }
 
         await Track.deleteOne({_id: id});
+        await Like.deleteMany({trackId: id});
         res.status(200).json({
             message: "Xóa bài hát thành công."
         });
