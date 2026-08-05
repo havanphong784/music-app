@@ -1,8 +1,10 @@
 import {CookieOptions, Request, Response} from "express";
 import User from "../../models/v1/user.model.js";
 import bcrypt from 'bcrypt';
+import {createHash, randomBytes} from "node:crypto";
 import {generateAcceptToken, generateRefreshToken, verifyRefreshToken} from "../../utils/jwt.utils.js";
 import RefreshToken from "../../models/v1/refreshToken.model.js";
+import {sendPasswordResetEmail} from "../../utils/mail.utils.js";
 
 const refreshCookieOptions: CookieOptions = {
     httpOnly: true,
@@ -17,10 +19,12 @@ const clearRefreshCookie = (res: Response) => {
     res.clearCookie("refreshToken", clearOptions);
 };
 
+const hashResetToken = (token: string) => createHash("sha256").update(token).digest("hex");
+
 export const register = async (req: Request, res: Response): Promise<void> => {
     let {name, email, password} = req.body;
 
-    const existingUser = await User.findOne({email: email});
+    const existingUser = await User.findOne({email});
     if (existingUser) {
         res.status(409).json({
             message: "User đã tồn tại.",
@@ -29,10 +33,18 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
 
     password = await bcrypt.hash(password, 12);
-    const user = new User({name: name, email: email, password: password});
+    const user = new User({name, email, password});
     await user.save();
-    res.status(200).json({
+    res.status(201).json({
         message: "Tạo tài khoản thành công.",
+        data: {
+            user: {
+                _id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+            }
+        }
     });
 }
 
@@ -75,8 +87,63 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
 }
 
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+    const resetToken = randomBytes(32).toString("hex");
+    const hashedToken = hashResetToken(resetToken);
+    const user = await User.findOneAndUpdate(
+        {email: req.body.email, deleted: false},
+        {
+            $set: {
+                passwordResetToken: hashedToken,
+                passwordResetExpiresAt: new Date(Date.now() + 15 * 60 * 1000)
+            }
+        }
+    );
+
+    if (user) {
+        try {
+            await sendPasswordResetEmail(user.email, resetToken);
+        } catch (error) {
+            await User.updateOne(
+                {_id: user._id, passwordResetToken: hashedToken},
+                {$unset: {passwordResetToken: 1, passwordResetExpiresAt: 1}}
+            );
+            throw error;
+        }
+    }
+
+    res.status(200).json({
+        message: "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi."
+    });
+}
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+    const password = await bcrypt.hash(req.body.password, 12);
+    const user = await User.findOneAndUpdate(
+        {
+            passwordResetToken: hashResetToken(req.body.token),
+            passwordResetExpiresAt: {$gt: new Date()},
+            deleted: false
+        },
+        {
+            $set: {password},
+            $unset: {passwordResetToken: 1, passwordResetExpiresAt: 1}
+        },
+        {returnDocument: "after", runValidators: true}
+    );
+
+    if (!user) {
+        res.status(400).json({message: "Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn."});
+        return;
+    }
+
+    await RefreshToken.deleteMany({userId: user.id});
+    clearRefreshCookie(res);
+    res.status(200).json({message: "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại."});
+}
+
 export const refreshToken = async (req: Request, res: Response): Promise<void> => {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies?.refreshToken;
     if (!refreshToken) {
         res.status(401).json({message: 'Không tìm thấy Refresh Token'});
         return;
@@ -145,7 +212,7 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
 }
 
 export const logout = async (req: Request, res: Response): Promise<void> => {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies?.refreshToken;
 
     if (refreshToken) {
         await RefreshToken.deleteOne({token: refreshToken});
@@ -154,4 +221,10 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
     clearRefreshCookie(res);
 
     res.status(200).json({message: "Đăng xuất thành công."});
+}
+
+export const deleteSessions = async (req: Request, res: Response): Promise<void> => {
+    await RefreshToken.deleteMany({userId: req.user.userId});
+    clearRefreshCookie(res);
+    res.sendStatus(204);
 }

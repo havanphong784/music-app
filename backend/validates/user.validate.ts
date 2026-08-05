@@ -1,7 +1,7 @@
 import {NextFunction, Request, Response} from 'express'
 
 export const patchMe = async (req: Request, res: Response, next: NextFunction) => {
-    const {name} = req.body;
+    const {name} = req.body ?? {};
     const files = req.files as {[fieldname: string]: Express.Multer.File[]} | undefined;
     const avatar = files?.avatar?.[0];
 

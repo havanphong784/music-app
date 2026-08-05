@@ -6,27 +6,29 @@
   "main": "index.ts",
   "scripts": {
     "dev": "tsx watch index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tsx --test validates/*.test.ts utils/*.test.ts"
   },
   "dependencies": {
-    "multer": "^2.2.0",
-    "cloudinary": "^2.10.0",
     "bcrypt": "^6.0.0",
+    "cloudinary": "^2.10.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.8.1",
     "mongoose-slug-updater": "^3.3.0",
+    "multer": "^2.2.0",
+    "nodemailer": "^9.0.4",
     "tsx": "^4.23.1",
     "typescript": "^7.0.2"
   },
   "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/multer": "^2.2.0",
-    "@types/node": "^26.1.2",
     "@types/bcrypt": "^6.0.0",
     "@types/cookie-parser": "^1.4.10",
-    "@types/jsonwebtoken": "^9.0.10"
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^26.1.2",
+    "@types/nodemailer": "^8.0.1"
   }
 }

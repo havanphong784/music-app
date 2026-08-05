@@ -24,19 +24,20 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
 export const patchMe = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = req.user.userId;
+        const body = req.body ?? {};
         const updateData: {name?: string; avatar?: string} = {};
 
-        if (typeof req.body.name === "string") {
-            updateData.name = req.body.name.trim();
+        if (typeof body.name === "string") {
+            updateData.name = body.name.trim();
         }
-        if (typeof req.body.avatarUrl === "string") {
-            updateData.avatar = req.body.avatarUrl;
+        if (typeof body.avatarUrl === "string") {
+            updateData.avatar = body.avatarUrl;
         }
 
         const user = await User.findOneAndUpdate(
             {_id: id, deleted: false},
             {$set: updateData},
-            {new: true, runValidators: true}
+            {returnDocument: "after", runValidators: true}
         ).select("-password");
 
         if (!user) {

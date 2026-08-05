@@ -1,7 +1,7 @@
 import {NextFunction, Request, Response} from "express";
 
 export const createTrackValidate = (req: Request, res: Response, next: NextFunction) => {
-    const {title, genre} = req.body;
+    const {title, genre} = req.body ?? {};
 
     if (!title || !title.trim()) {
         return res.status(400).json({
@@ -25,7 +25,7 @@ export const createTrackValidate = (req: Request, res: Response, next: NextFunct
 }
 
 export const patchTrackValidate = (req: Request, res: Response, next: NextFunction) => {
-    const {title, genre} = req.body;
+    const {title, genre} = req.body ?? {};
 
     if (title !== undefined && (!title || !title.trim())) {
         return res.status(400).json({

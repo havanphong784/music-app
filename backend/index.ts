@@ -33,6 +33,11 @@ app.use(cookieParser());
 
 routesV1(app);
 
+app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error(error);
+    res.status(500).json({message: "Lỗi máy chủ"});
+});
+
 app.listen(PORT, () => {
     console.log(`App đang chạy ở ${PORT}`);
 })

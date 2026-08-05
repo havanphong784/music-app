@@ -69,7 +69,7 @@ export const tracksPost = async (req: Request, res: Response): Promise<void> => 
             lyricsUrl,
             lyricsPublicId,
             audioDuration
-        } = req.body;
+        } = req.body ?? {};
         const trackData = {
             title,
             description,
@@ -151,7 +151,7 @@ export const patchTrackId = async (req: Request, res: Response): Promise<void> =
             lyricsUrl,
             lyricsPublicId,
             audioDuration
-        } = req.body;
+        } = req.body ?? {};
         const updateData: Partial<ITrack> = {};
 
         if (title !== undefined) updateData.title = title.trim();
@@ -269,7 +269,7 @@ export const getTrackStream = async (req: Request, res: Response): Promise<void>
 export const postTrackPlay = async (req: Request, res: Response): Promise<void> => {
     try {
         const track = await Track.findByIdAndUpdate(req.params.trackId, {$inc: {playCount: 1}}, {
-            new: true,
+            returnDocument: "after",
             runValidators: true
         }).select("_id playCount");
         if (!track) {
@@ -301,7 +301,7 @@ export const postTrackPlay = async (req: Request, res: Response): Promise<void> 
 
 export const postTrackComment = async (req: Request, res: Response): Promise<void> => {
     try {
-        const {content, parentId} = req.body;
+        const {content, parentId} = req.body ?? {};
         if (!content || content.trim() === "") {
             res.status(400).json({
                 message: "Bình luận không được để trống"
