@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model albums {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String    @db.VarChar(255)
+  cover_url    String?
+  release_date DateTime? @db.Date
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  tracks       tracks[]
+}
+
+model artist_members {
+  user_id    String    @db.Uuid
+  artist_id  String    @db.Uuid
+  role       String?   @default("manager") @db.VarChar(50)
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  artists    artists   @relation(fields: [artist_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, artist_id])
+}
+
+model artists {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                  String                  @db.VarChar(255)
+  avatar_url            String?
+  bio                   String?
+  verified              Boolean?                @default(false)
+  artist_members        artist_members[]
+  track_artists         track_artists[]
+  user_followed_artists user_followed_artists[]
+}
+
+model genres {
+  id           Int            @id @default(autoincrement())
+  name         String         @unique @db.VarChar(50)
+  slug         String         @unique @db.VarChar(50)
+  track_genres track_genres[]
+}
+
+model play_history {
+  id        BigInt    @id @default(autoincrement())
+  user_id   String?   @db.Uuid
+  track_id  String?   @db.Uuid
+  played_at DateTime? @default(now()) @db.Timestamptz(6)
+  tracks    tracks?   @relation(fields: [track_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users     users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, played_at(sort: Desc)], map: "idx_play_history_user")
+}
+
+model playlist_tracks {
+  playlist_id String    @db.Uuid
+  track_id    String    @db.Uuid
+  position    Int
+  added_at    DateTime? @default(now()) @db.Timestamptz(6)
+  playlists   playlists @relation(fields: [playlist_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tracks      tracks    @relation(fields: [track_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([playlist_id, track_id])
+}
+
+model playlists {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id         String            @db.Uuid
+  title           String            @db.VarChar(255)
+  cover_url       String?
+  is_public       Boolean?          @default(true)
+  created_at      DateTime?         @default(now()) @db.Timestamptz(6)
+  playlist_tracks playlist_tracks[]
+  users           users             @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model track_artists {
+  track_id  String  @db.Uuid
+  artist_id String  @db.Uuid
+  role      String? @default("primary") @db.VarChar(20)
+  artists   artists @relation(fields: [artist_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tracks    tracks  @relation(fields: [track_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([track_id, artist_id])
+  @@index([artist_id], map: "idx_track_artists_artist")
+}
+
+model track_genres {
+  track_id String @db.Uuid
+  genre_id Int
+  genres   genres @relation(fields: [genre_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tracks   tracks @relation(fields: [track_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([track_id, genre_id])
+}
+
+model tracks {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  album_id             String?                @db.Uuid
+  title                String                 @db.VarChar(255)
+  duration_seconds     Int
+  audio_url            String
+  lyrics               Json?
+  play_count           BigInt?                @default(0)
+  created_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  play_history         play_history[]
+  playlist_tracks      playlist_tracks[]
+  track_artists        track_artists[]
+  track_genres         track_genres[]
+  albums               albums?                @relation(fields: [album_id], references: [id], onUpdate: NoAction)
+  user_favorite_tracks user_favorite_tracks[]
+
+  @@index([album_id], map: "idx_tracks_album")
+}
+
+model user_favorite_tracks {
+  user_id    String    @db.Uuid
+  track_id   String    @db.Uuid
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  tracks     tracks    @relation(fields: [track_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, track_id])
+}
+
+model user_followed_artists {
+  user_id    String    @db.Uuid
+  artist_id  String    @db.Uuid
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  artists    artists   @relation(fields: [artist_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, artist_id])
+}
+
+model users {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                 String                  @unique @db.VarChar(255)
+  password_hash         String                  @db.VarChar(255)
+  display_name          String                  @db.VarChar(100)
+  avatar_url            String?
+  role                  String?                 @default("user") @db.VarChar(20)
+  created_at            DateTime?               @default(now()) @db.Timestamptz(6)
+  artist_members        artist_members[]
+  play_history          play_history[]
+  playlists             playlists[]
+  user_favorite_tracks  user_favorite_tracks[]
+  user_followed_artists user_followed_artists[]
+}
