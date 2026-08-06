@@ -15,7 +15,9 @@ const commentSchema = new mongoose.Schema<IComment>({
     },
     userId: {
         type: String,
+        ref: "User",
         required: true,
+        index: true,
     },
     content: {
         type: String,
@@ -23,6 +25,8 @@ const commentSchema = new mongoose.Schema<IComment>({
     },
     parentId: String,
 }, {timestamps: true});
+
+commentSchema.index({trackId: 1, createdAt: -1});
 
 
 const Comment = mongoose.model<IComment>("Comment", commentSchema, "comments");

@@ -1,17 +1,87 @@
-import {Request, Response} from "express";
+import {NextFunction, Request, Response} from "express";
 import Track, {ITrack} from "../../models/v1/tracks.model.js";
 import Comment from "../../models/v1/comment.model.js";
 import cloudinaryConfig from "../../config/cloudinary.config.js";
 import {Like} from "../../models/v1/like.model.js";
+import mongoose from "mongoose";
 
-export const tracksGet = async (req: Request, res: Response): Promise<void> => {
+const TRACK_PUBLIC_FIELDS = [
+    "title",
+    "slug",
+    "description",
+    "coverImageUrl",
+    "lyricsUrl",
+    "duration",
+    "genre",
+    "artist",
+    "playCount",
+    "likeCount",
+    "createdAt",
+    "updatedAt"
+].join(" ");
+
+const TRACK_SORT_FIELDS = new Set(["createdAt", "playCount", "likeCount", "title"]);
+const USER_PUBLIC_FIELDS = "name avatar createdAt";
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const parsePagination = (page: unknown, limit: unknown) => {
+    const parsedPage = typeof page === "string" ? Number(page) : Number.NaN;
+    const parsedLimit = typeof limit === "string" ? Number(limit) : Number.NaN;
+
+    return {
+        page: Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1,
+        limit: Number.isInteger(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 20
+    };
+};
+
+const serializeComment = (comment: Record<string, any>) => ({
+    _id: comment._id,
+    trackId: comment.trackId,
+    content: comment.content,
+    parentId: comment.parentId ?? null,
+    author: comment.userId,
+    createdAt: comment.createdAt,
+    updatedAt: comment.updatedAt
+});
+
+const cleanupTrackAssets = async (track: ITrack) => {
+    const tasks: Promise<unknown>[] = [];
+
+    if (track.audioPublicId) {
+        tasks.push(cloudinaryConfig.uploader.destroy(track.audioPublicId, {
+            resource_type: "video",
+            type: "authenticated",
+            invalidate: true
+        }));
+    }
+    if (track.coverImagePublicId) {
+        tasks.push(cloudinaryConfig.uploader.destroy(track.coverImagePublicId, {
+            resource_type: "image",
+            invalidate: true
+        }));
+    }
+    if (track.lyricsPublicId) {
+        tasks.push(cloudinaryConfig.uploader.destroy(track.lyricsPublicId, {
+            resource_type: "raw",
+            invalidate: true
+        }));
+    }
+
+    const results = await Promise.allSettled(tasks);
+    results
+        .filter(result => result.status === "rejected")
+        .forEach(result => console.error("Cloudinary cleanup failed:", result.reason));
+};
+
+export const tracksGet = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const {sortKey, sortValue, keyword, genre, page, limit} = req.query;
 
         const find: Record<string, any> = {};
 
         if (keyword && typeof keyword === "string" && keyword.trim() !== "") {
-            find.title = new RegExp(keyword, "i");
+            find.title = new RegExp(escapeRegExp(keyword.trim()), "i");
         }
 
         if (genre && typeof genre === "string" && genre.trim() !== "") {
@@ -19,21 +89,22 @@ export const tracksGet = async (req: Request, res: Response): Promise<void> => {
         }
 
         const sort: Record<string, 1 | -1> = {};
-        if (sortKey && typeof sortKey === "string") {
+        if (typeof sortKey === "string" && TRACK_SORT_FIELDS.has(sortKey)) {
             const isAsc = sortValue === "asc" || sortValue === "1";
             sort[sortKey] = isAsc ? 1 : -1;
         } else {
             sort.createdAt = -1;
         }
 
-        const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
-        const limitNum = Math.max(1, parseInt(limit as string, 10) || 20);
+        const {page: pageNum, limit: limitNum} = parsePagination(page, limit);
         const skip = (pageNum - 1) * limitNum;
 
         const totalCount = await Track.countDocuments(find);
         const totalPages = Math.ceil(totalCount / limitNum);
 
         const tracks = await Track.find(find)
+            .select(TRACK_PUBLIC_FIELDS)
+            .populate("artist", USER_PUBLIC_FIELDS)
             .sort(sort)
             .skip(skip)
             .limit(limitNum);
@@ -48,15 +119,12 @@ export const tracksGet = async (req: Request, res: Response): Promise<void> => {
                 totalPages
             }
         });
-    } catch (err: any) {
-        res.status(500).json({
-            message: "Lỗi lấy danh sách bài hát",
-            error: err.message
-        });
+    } catch (error) {
+        next(error);
     }
 };
 
-export const tracksPost = async (req: Request, res: Response): Promise<void> => {
+export const tracksPost = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const {
             title,
@@ -86,22 +154,25 @@ export const tracksPost = async (req: Request, res: Response): Promise<void> => 
 
         const track = new Track(trackData);
         await track.save();
-        res.status(200).json({
+        const publicTrack = await Track.findById(track._id)
+            .select(TRACK_PUBLIC_FIELDS)
+            .populate("artist", USER_PUBLIC_FIELDS);
+
+        res.status(201).json({
             message: "Tạo bài hát thành công",
-            data: track
+            data: publicTrack
         })
-    } catch (err: any) {
-        res.status(500).json({
-            message: "Lỗi tạo bài hát",
-            error: err.message
-        })
+    } catch (error) {
+        next(error);
     }
 }
 
-export const getTrackId = async (req: Request, res: Response): Promise<void> => {
+export const getTrackId = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-        const id = req.params.trackId;
-        const track = await Track.findById(id);
+        const id = String(req.params.trackId);
+        const track = await Track.findById(id)
+            .select(TRACK_PUBLIC_FIELDS)
+            .populate("artist", USER_PUBLIC_FIELDS);
 
         if (!track) {
             res.status(404).json({
@@ -113,16 +184,14 @@ export const getTrackId = async (req: Request, res: Response): Promise<void> => 
             message: "Lấy thông tin bài hát thành công.",
             data: track
         })
-    } catch (err) {
-        res.status(400).json({
-            message: "Id bài hát không hợp lệ"
-        })
+    } catch (error) {
+        next(error);
     }
 }
 
-export const patchTrackId = async (req: Request, res: Response): Promise<void> => {
+export const patchTrackId = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-        const id = req.params.trackId;
+        const id = String(req.params.trackId);
         const track = await Track.findById(id);
 
         if (!track) {
@@ -170,23 +239,14 @@ export const patchTrackId = async (req: Request, res: Response): Promise<void> =
         res.status(200).json({
             message: "Cập nhật bài hát thành công."
         });
-    } catch (err: any) {
-        if (err.name === "CastError") {
-            res.status(400).json({
-                message: "Id bài hát không hợp lệ."
-            });
-            return;
-        }
-        res.status(500).json({
-            message: "Lỗi cập nhật bài hát",
-            error: err.message
-        });
+    } catch (error) {
+        next(error);
     }
 };
 
-export const deleteTrack = async (req: Request, res: Response): Promise<void> => {
+export const deleteTrack = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-        const id = req.params.trackId;
+        const id = String(req.params.trackId);
         const track = await Track.findById(id);
         if (!track) {
             res.status(404).json({
@@ -203,28 +263,21 @@ export const deleteTrack = async (req: Request, res: Response): Promise<void> =>
             return;
         }
 
-        await Track.deleteOne({_id: id});
-        await Like.deleteMany({trackId: id});
-        res.status(200).json({
-            message: "Xóa bài hát thành công."
-        });
-    } catch (err: any) {
-        if (err.name === "CastError") {
-            res.status(400).json({
-                message: "Id bài hát không hợp lệ."
-            });
-            return;
-        }
-        res.status(500).json({
-            message: "Lỗi xóa bài hát",
-            error: err.message
-        });
+        await Promise.all([
+            Track.deleteOne({_id: id}),
+            Like.deleteMany({trackId: id}),
+            Comment.deleteMany({trackId: id})
+        ]);
+        await cleanupTrackAssets(track);
+        res.sendStatus(204);
+    } catch (error) {
+        next(error);
     }
 };
 
-export const getTrackStream = async (req: Request, res: Response): Promise<void> => {
+export const getTrackStream = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-        const id = req.params.trackId;
+        const id = String(req.params.trackId);
         const track = await Track.findById(id);
         if (!track) {
             res.status(404).json({
@@ -252,23 +305,15 @@ export const getTrackStream = async (req: Request, res: Response): Promise<void>
             streamUrl,
             expiresAt
         });
-    } catch (err: any) {
-        if (err.name === "CastError") {
-            res.status(400).json({
-                message: "Id bài hát không hợp lệ."
-            });
-            return;
-        }
-        res.status(500).json({
-            message: "Lỗi khi lấy stream.",
-            error: err.message
-        });
+    } catch (error) {
+        next(error);
     }
 };
 
-export const postTrackPlay = async (req: Request, res: Response): Promise<void> => {
+export const postTrackPlay = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-        const track = await Track.findByIdAndUpdate(req.params.trackId, {$inc: {playCount: 1}}, {
+        const trackId = String(req.params.trackId);
+        const track = await Track.findByIdAndUpdate(trackId, {$inc: {playCount: 1}}, {
             returnDocument: "after",
             runValidators: true
         }).select("_id playCount");
@@ -285,30 +330,21 @@ export const postTrackPlay = async (req: Request, res: Response): Promise<void> 
                 playCount: track.playCount
             }
         });
-    } catch (err: any) {
-        if (err.name === "CastError") {
-            res.status(400).json({
-                message: "Id bài hát không hợp lệ."
-            });
-            return;
-        }
-        res.status(500).json({
-            message: "Lỗi ghi nhận lượt nghe.",
-            error: err.message
-        });
+    } catch (error) {
+        next(error);
     }
 };
 
-export const postTrackComment = async (req: Request, res: Response): Promise<void> => {
+export const postTrackComment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const {content, parentId} = req.body ?? {};
-        if (!content || content.trim() === "") {
+        if (typeof content !== "string" || content.trim() === "" || content.trim().length > 1000) {
             res.status(400).json({
-                message: "Bình luận không được để trống"
+                message: "Bình luận phải có từ 1 đến 1000 ký tự."
             });
             return;
         }
-        const id = req.params.trackId;
+        const id = String(req.params.trackId);
         const track = await Track.findById(id);
         if (!track) {
             res.status(404).json({
@@ -333,106 +369,101 @@ export const postTrackComment = async (req: Request, res: Response): Promise<voi
         });
 
         await comment.save();
+        const populatedComment = await Comment.findById(comment._id)
+            .populate("userId", USER_PUBLIC_FIELDS)
+            .lean();
 
         res.status(201).json({
             message: "Gửi bình luận thành công.",
-            data: comment
+            data: populatedComment ? serializeComment(populatedComment) : null
         });
-    } catch (err: any) {
-        if (err.name === "CastError") {
-            res.status(400).json({
-                message: "Id bài hát không hợp lệ."
-            });
-            return;
-        }
-        res.status(500).json({
-            message: "Lỗi gửi comment",
-            error: err.message
-        });
+    } catch (error) {
+        next(error);
     }
 };
 
-export const getTrackComment = async (req: Request, res: Response): Promise<void> => {
+export const getTrackComment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-        const id = req.params.trackId;
-        const track = await Track.findById(id);
-        if (!track) {
-            res.status(404).json({
-                message: "Bài hát không tồn tại."
-            });
+        const trackId = String(req.params.trackId);
+        const {page, limit, parentId} = req.query;
+        const {page: pageNum, limit: limitNum} = parsePagination(page, limit);
+        const find: Record<string, unknown> = {trackId};
+
+        if (!mongoose.isValidObjectId(trackId)) {
+            res.status(400).json({message: "Id bài hát không hợp lệ."});
             return;
         }
-        const comments = await Comment.find({trackId: id}).sort({createdAt: -1});
+
+        if (typeof parentId === "string" && parentId.trim()) {
+            if (!mongoose.isValidObjectId(parentId.trim())) {
+                res.status(400).json({message: "Id bình luận cha không hợp lệ."});
+                return;
+            }
+            find.parentId = parentId.trim();
+        }
+
+        const [totalCount, comments] = await Promise.all([
+            Comment.countDocuments(find),
+            Comment.find(find)
+                .populate("userId", USER_PUBLIC_FIELDS)
+                .sort({createdAt: -1})
+                .skip((pageNum - 1) * limitNum)
+                .limit(limitNum)
+                .lean()
+        ]);
+
         res.status(200).json({
             message: "Lấy danh sách bình luận thành công.",
-            data: comments
+            data: comments.map(comment => serializeComment(comment)),
+            pagination: {
+                currentPage: pageNum,
+                limit: limitNum,
+                totalCount,
+                totalPages: Math.ceil(totalCount / limitNum)
+            }
         });
-    } catch (err: any) {
-        if (err.name === "CastError") {
-            res.status(400).json({
-                message: "Id bài hát không hợp lệ."
-            });
-            return;
-        }
-        res.status(500).json({
-            message: "Lỗi lấy danh sách bình luận.",
-            error: err.message
-        });
+    } catch (error) {
+        next(error);
     }
 };
 
-export const postTrackLike = async (req: Request, res: Response): Promise<void> => {
+export const postTrackLike = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-        const trackId = req.params.trackId;
+        const trackId = String(req.params.trackId);
         const userId = req.user.userId;
 
-        const trackStore = await Track.findById(trackId);
-        if (!trackStore) {
-            res.status(404).json({
-                message: "Bài hát không tồn tại."
-            });
+        const trackExists = await Track.exists({_id: trackId});
+        if (!trackExists) {
+            res.status(404).json({message: "Bài hát không tồn tại."});
             return;
         }
 
-        const like = await Like.findOne({
-            userId: userId,
-            trackId: trackId
-        });
-
-        if (like) {
-            res.status(200).json({
-                message: "Bạn đã like bài hát này rồi."
-            });
-            return;
+        const newLike = await Like.create({userId, trackId});
+        try {
+            const track = await Track.findByIdAndUpdate(trackId, {$inc: {likeCount: 1}});
+            if (!track) {
+                await Like.deleteOne({_id: newLike._id});
+                res.status(404).json({message: "Bài hát không tồn tại."});
+                return;
+            }
+        } catch (error) {
+            await Like.deleteOne({_id: newLike._id});
+            throw error;
         }
 
-        const newLike = new Like({userId, trackId});
-        await newLike.save();
-
-        await Track.findByIdAndUpdate(trackId, {$inc: {likeCount: 1}});
-
-        res.status(200).json({
+        res.status(201).json({
             message: "Like bài hát thành công.",
             data: newLike,
         });
-    } catch (err: any) {
-        if (err.name === "CastError") {
-            res.status(400).json({
-                message: "Id bài hát không hợp lệ."
-            });
-            return;
-        }
-        res.status(500).json({
-            message: "Lỗi khi like bài hát.",
-            error: err.message
-        });
+    } catch (error) {
+        next(error);
     }
 };
 
 
-export const deleteTrackLike = async (req: Request, res: Response): Promise<void> => {
+export const deleteTrackLike = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-        const trackId = req.params.trackId;
+        const trackId = String(req.params.trackId);
         const userId = req.user.userId;
 
         if (!userId) {
@@ -442,39 +473,29 @@ export const deleteTrackLike = async (req: Request, res: Response): Promise<void
             return;
         }
 
-        const trackStored = await Track.findById(trackId);
-        if (!trackStored) {
+        const trackExists = await Track.exists({_id: trackId});
+        if (!trackExists) {
             res.status(404).json({
                 message: "Bài hát không tồn tại."
             });
             return;
         }
 
-        const like = await Like.findOne({trackId: trackId, userId: userId});
+        const like = await Like.findOneAndDelete({trackId, userId});
         if (!like) {
-            res.status(400).json({
+            res.status(404).json({
                 message: "Bạn chưa like bài hát này."
             });
             return;
         }
 
-        await Like.findByIdAndDelete(like._id);
-        const updatedLikeCount = Math.max(0, trackStored.likeCount - 1);
-        await Track.findByIdAndUpdate(trackId, {likeCount: updatedLikeCount});
+        await Track.updateOne(
+            {_id: trackId},
+            [{$set: {likeCount: {$max: [{$subtract: ["$likeCount", 1]}, 0]}}}]
+        );
 
-        res.status(200).json({
-            message: "Đã hủy like thành công."
-        });
-    } catch (e: any) {
-        if (e.name === "CastError") {
-            res.status(400).json({
-                message: "Id bài hát không hợp lệ."
-            });
-            return;
-        }
-        res.status(500).json({
-            message: "Lỗi khi hủy like.",
-            error: e.message
-        });
+        res.sendStatus(204);
+    } catch (error) {
+        next(error);
     }
 };

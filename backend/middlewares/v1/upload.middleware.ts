@@ -83,7 +83,6 @@ export const uploadToCloudinaryMultiple = async (req: Request, res: Response, ne
 
         next();
     } catch (error) {
-        console.error("Cloudinary Upload Error:", error);
-        res.status(500).json({message: 'Lỗi khi upload nhiều file lên Cloudinary'});
+        next(error);
     }
 };

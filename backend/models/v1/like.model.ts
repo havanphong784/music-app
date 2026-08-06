@@ -18,4 +18,6 @@ const likeSchema = new mongoose.Schema<ILike>({
     }
 }, {timestamps: true});
 
+likeSchema.index({userId: 1, trackId: 1}, {unique: true});
+
 export const Like = mongoose.model<ILike>("Like", likeSchema, "likes");
