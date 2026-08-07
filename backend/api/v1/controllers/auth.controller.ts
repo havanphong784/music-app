@@ -1,7 +1,8 @@
 import prisma from "../../../config/db";
 import {Request, Response} from "express";
 import bcrypt from "bcrypt"
-import {generateAccessToken, generateRefreshToken} from "../utils/jwt";
+import {generateAccessToken, generateRefreshToken, verifyRefreshToken} from "../utils/jwt.utils";
+import {consumeRefreshToken, revokeRefreshToken, saveRefreshToken} from "../services/refreshToken.services";
 
 export const register = async (req: Request, res: Response) => {
     try {
@@ -40,16 +41,20 @@ export const login = async (req: Request, res: Response) => {
             return res.status(400).json({message: "Mật khẩu không đúng"});
         }
 
-        const refreshToken = generateRefreshToken({
+        const {token: refreshToken, jti} = generateRefreshToken({
             userId: user.id,
             email: user.email,
             userName: user.display_name,
             role: user.role ? user.role : "user"
         });
+
+        await saveRefreshToken(jti, refreshToken);
+
         res.cookie("refreshToken", refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "strict",
+            path: "/api/v1/auth",
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 ngày
         });
 
@@ -66,3 +71,72 @@ export const login = async (req: Request, res: Response) => {
         res.status(500).json({message: "Lỗi hệ thống"});
     }
 }
+
+export const refresh = async (req: Request, res: Response) => {
+    const oldToken = req.cookies.refreshToken;
+    if (!oldToken) {
+        return res.status(401).json({message: "Thiếu refresh token"});
+    }
+
+    const payload = verifyRefreshToken(oldToken);
+    if (!payload || typeof payload.jti !== "string") {
+        return res.status(401).json({message: "Refresh token không hợp lệ"});
+    }
+
+    const valid = await consumeRefreshToken(payload.jti, oldToken);
+    if (!valid) {
+        res.clearCookie("refreshToken", {
+            path: "/api/v1/auth"
+        });
+
+        return res.status(401).json({
+            message: "Refresh token đã hết hạn hoặc đã được sử dụng"
+        });
+    }
+
+    const tokenPayload = {
+        userId: payload.userId,
+        email: payload.email,
+        userName: payload.userName,
+        role: payload.role
+    };
+
+    const accessToken = generateAccessToken(tokenPayload);
+    const nextRefresh = generateRefreshToken(tokenPayload);
+
+    await saveRefreshToken(nextRefresh.jti, nextRefresh.token);
+
+    res.cookie("refreshToken", nextRefresh.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/api/v1/auth",
+        maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
+    return res.status(200).json({token: accessToken});
+};
+
+export const logout = async (req: Request, res: Response) => {
+    const refreshToken = req.cookies.refreshToken;
+
+    if (refreshToken) {
+        const payload = verifyRefreshToken(refreshToken);
+        if (payload && typeof payload.jti === "string") {
+            await revokeRefreshToken(
+                payload.jti
+            );
+        }
+    }
+
+    res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/api/v1/auth"
+    });
+
+    return res.status(200).json({
+        message: "Đăng xuất thành công"
+    });
+};

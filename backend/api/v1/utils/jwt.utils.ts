@@ -27,11 +27,13 @@ const getSecret = (tokenType: TokenType): string => {
 }
 
 export const generateRefreshToken = (payload: IPayload) => {
-    return jwt.sign(
+    const jti = randomUUID();
+    const token = jwt.sign(
         {...payload, tokenType: "refresh"},
         getSecret("refresh"),
-        {expiresIn: "7d", jwtid: randomUUID()}
+        {expiresIn: "7d", jwtid: jti}
     );
+    return {token, jti};
 }
 
 export const generateAccessToken = (payload: IPayload) => {
