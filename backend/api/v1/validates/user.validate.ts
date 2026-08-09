@@ -3,9 +3,10 @@ import validator from "validator";
 
 export const updateMe = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
     const {display_name, avatar_url} = req.body;
+    const hasFile = !!req.file;
 
-    if (display_name === undefined && avatar_url === undefined) {
-        return res.status(400).json({message: "Cần cung cấp ít nhất một thông tin để cập nhật (display_name hoặc avatar_url)"});
+    if (display_name === undefined && avatar_url === undefined && !hasFile) {
+        return res.status(400).json({message: "Cần cung cấp ít nhất một thông tin để cập nhật (display_name, avatar_url hoặc file ảnh)"});
     }
 
     if (display_name !== undefined) {
