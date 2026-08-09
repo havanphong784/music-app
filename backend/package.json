@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "type": "module",
-  "main": "index.ts",
+  "main": "src/server.ts",
   "scripts": {
     "test": "node --import tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test && prisma validate",
-    "dev": "tsx index.ts"
+    "dev": "tsx src/server.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

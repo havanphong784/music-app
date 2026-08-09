@@ -6,3 +6,4 @@
 /backend/.env
 /POSTMAN.md
 /postman-collection.json
+/backend/tests/

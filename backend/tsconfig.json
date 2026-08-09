@@ -9,9 +9,7 @@
     "noEmit": true
   },
   "include": [
-    "index.ts",
-    "api/**/*.ts",
-    "config/**/*.ts",
+    "src/**/*.ts",
     "tests/**/*.ts",
     "prisma.config.ts"
   ]

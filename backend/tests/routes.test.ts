@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {NextFunction, Request, Response} from "express";
-import {hasValidFileSignature, isAllowedMimeType} from "../api/v1/middlewares/uploadCloud.middleware";
-import {createTrack, getTrackById} from "../api/v1/validates/track.validate";
-import {getGenres} from "../api/v1/validates/genre.validate";
-import {createAlbum} from "../api/v1/validates/album.validate";
-import {reorderTracks} from "../api/v1/validates/playlist.validate";
-import {formatTrack} from "../api/v1/utils/response.utils";
-import {handleError} from "../api/v1/middlewares/error.middleware";
+import {hasValidFileSignature, isAllowedMimeType} from "../src/middlewares/upload.middleware";
+import {createTrack, getTrackById} from "../src/validators/track.validator";
+import {getGenres} from "../src/validators/genre.validator";
+import {createAlbum} from "../src/validators/album.validator";
+import {reorderTracks} from "../src/validators/playlist.validator";
+import {formatTrack} from "../src/utils/response";
+import {handleError} from "../src/middlewares/error.middleware";
 
 const runMiddleware = async (
     middleware: (req: Request, res: Response, next: NextFunction) => Promise<Response | void>,
