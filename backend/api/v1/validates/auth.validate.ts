@@ -2,27 +2,30 @@ import {NextFunction, Request, Response} from "express";
 import validator from "validator";
 
 export interface RequestBody {
-    email?: string,
-    password?: string,
-    userName?: string
+    email?: string;
+    password?: string;
+    display_name?: string;
+    userName?: string;
 }
 
 export const register = async (req: Request<{}, {}, RequestBody>, res: Response, next: NextFunction): Promise<Response | void> => {
-    const {email, password, userName} = req.body;
-    if (!email || typeof email !== "string" || !email.trim() || email.trim() === "") {
+    const {email, password, display_name, userName} = req.body;
+    const name = display_name || userName;
+
+    if (!email || typeof email !== "string" || !email.trim()) {
         return res.status(400).json({message: "Email không được để trống"});
     }
     if (!validator.isEmail(email)) {
         return res.status(400).json({message: "Email không hợp lệ"});
     }
-    if (!password || typeof password !== "string" || !password.trim() || password.trim() === "") {
+    if (!password || typeof password !== "string" || !password.trim()) {
         return res.status(400).json({message: "Mật khẩu không được để trống"});
     }
     if (!validator.isLength(password, {min: 6, max: 100})) {
         return res.status(400).json({message: "Mật khẩu phải từ 6 đến 100 ký tự"});
     }
-    if (!userName || typeof userName !== "string" || !userName.trim() || userName.trim() === "" || userName.length > 20) {
-        return res.status(400).json({message: "Tên người dùng không được để trống và phải dưới 20 ký tự"});
+    if (!name || typeof name !== "string" || !name.trim() || name.trim().length > 100) {
+        return res.status(400).json({message: "Tên hiển thị không được để trống và tối đa 100 ký tự"});
     }
     next();
 }

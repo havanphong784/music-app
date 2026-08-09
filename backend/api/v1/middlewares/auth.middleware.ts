@@ -22,4 +22,18 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
     }
     req.user = user;
     next();
-}
+};
+
+export const requireRole = (requiredRole: string) => {
+    return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+        if (!req.user) {
+            return res.status(401).json({message: "Chưa xác thực"});
+        }
+        if (req.user.role !== requiredRole) {
+            return res.status(403).json({message: "Bạn không có quyền thực hiện thao tác này"});
+        }
+        next();
+    };
+};
+
+export const requireAdmin = requireRole("admin");

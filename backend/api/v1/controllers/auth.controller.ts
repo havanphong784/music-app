@@ -6,7 +6,9 @@ import {consumeRefreshToken, revokeRefreshToken, saveRefreshToken} from "../serv
 
 export const register = async (req: Request, res: Response) => {
     try {
-        const {email, password, userName} = req.body;
+        const {email, password, display_name, userName} = req.body;
+        const displayName = display_name || userName;
+
         const existEmail = await prisma.users.findUnique({where: {email: email}});
         if (existEmail) {
             return res.status(400).json({message: "Email đã tồn tại"});
@@ -17,7 +19,7 @@ export const register = async (req: Request, res: Response) => {
             data: {
                 email: email,
                 password_hash: passHash,
-                display_name: userName
+                display_name: displayName
             }
         });
         const {password_hash: _passwordHash, ...safeUser} = user;
