@@ -2,19 +2,12 @@ import prisma from "../../../config/db";
 import {Response} from "express";
 import {AuthenticatedRequest} from "../middlewares/auth.middleware";
 import cloudinary from "../../../config/cloudinary";
-
-const formatTrack = (track: any) => {
-    if (!track) return null;
-    return {
-        ...track,
-        play_count: track.play_count !== undefined && track.play_count !== null ? Number(track.play_count) : 0
-    };
-};
+import {buildPaginationMeta, parsePagination} from "../utils/pagination.utils";
+import {formatTrack} from "../utils/response.utils";
 
 export const getTracks = async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const page = Math.max(1, parseInt(req.query.page as string) || 1);
-        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 10));
+        const {page, limit, skip, take} = parsePagination(req.query);
         const q = (req.query.q as string)?.trim();
         const albumId = req.query.album_id as string;
         const genreId = req.query.genre_id ? parseInt(req.query.genre_id as string) : undefined;
@@ -40,8 +33,8 @@ export const getTracks = async (req: AuthenticatedRequest, res: Response) => {
         const total = await prisma.tracks.count({where: whereCondition});
         const tracksRaw = await prisma.tracks.findMany({
             where: whereCondition,
-            skip: (page - 1) * limit,
-            take: limit,
+            skip,
+            take,
             orderBy: {created_at: "desc"},
             include: {
                 albums: true,
@@ -62,12 +55,7 @@ export const getTracks = async (req: AuthenticatedRequest, res: Response) => {
 
         return res.status(200).json({
             tracks,
-            pagination: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit)
-            }
+            pagination: buildPaginationMeta(total, page, limit)
         });
     } catch (error) {
         return res.status(500).json({message: "Lỗi hệ thống"});

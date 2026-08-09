@@ -1,11 +1,11 @@
 import prisma from "../../../config/db";
 import {Response} from "express";
 import {AuthenticatedRequest} from "../middlewares/auth.middleware";
+import {buildPaginationMeta, parsePagination} from "../utils/pagination.utils";
 
 export const getArtists = async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const page = Math.max(1, parseInt(req.query.page as string) || 1);
-        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 10));
+        const {page, limit, skip, take} = parsePagination(req.query);
         const q = (req.query.q as string)?.trim();
         const verifiedQuery = req.query.verified;
 
@@ -22,19 +22,14 @@ export const getArtists = async (req: AuthenticatedRequest, res: Response) => {
         const total = await prisma.artists.count({where: whereCondition});
         const artists = await prisma.artists.findMany({
             where: whereCondition,
-            skip: (page - 1) * limit,
-            take: limit,
+            skip,
+            take,
             orderBy: {name: "asc"}
         });
 
         return res.status(200).json({
             artists,
-            pagination: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit)
-            }
+            pagination: buildPaginationMeta(total, page, limit)
         });
     } catch (error) {
         return res.status(500).json({message: "Lỗi hệ thống"});

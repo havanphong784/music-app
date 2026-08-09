@@ -1,8 +1,9 @@
 import prisma from "../../../config/db";
 import {Request, Response} from "express";
-import bcrypt from "bcrypt"
+import bcrypt from "bcrypt";
 import {generateAccessToken, generateRefreshToken, verifyRefreshToken} from "../utils/jwt.utils";
 import {consumeRefreshToken, revokeRefreshToken, saveRefreshToken} from "../services/refreshToken.services";
+import {sanitizeUser} from "../utils/response.utils";
 
 export const register = async (req: Request, res: Response) => {
     try {
@@ -22,12 +23,11 @@ export const register = async (req: Request, res: Response) => {
                 display_name: displayName
             }
         });
-        const {password_hash: _passwordHash, ...safeUser} = user;
-        res.status(201).json({message: "Đăng ký thành công", user: safeUser});
+        res.status(201).json({message: "Đăng ký thành công", user: sanitizeUser(user)});
     } catch (error) {
         res.status(500).json({message: "Lỗi hệ thống"});
     }
-}
+};
 
 export const login = async (req: Request, res: Response) => {
     try {
@@ -67,12 +67,11 @@ export const login = async (req: Request, res: Response) => {
             role: user.role ? user.role : "user"
         });
 
-        const {password_hash: _passwordHash, ...safeUser} = user;
-        res.status(200).json({message: "Đăng nhập thành công", user: safeUser, token: accessToken});
+        res.status(200).json({message: "Đăng nhập thành công", user: sanitizeUser(user), token: accessToken});
     } catch (error) {
         res.status(500).json({message: "Lỗi hệ thống"});
     }
-}
+};
 
 export const refresh = async (req: Request, res: Response) => {
     const oldToken = req.cookies.refreshToken;

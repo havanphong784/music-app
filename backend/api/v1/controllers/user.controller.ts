@@ -1,6 +1,8 @@
 import prisma from "../../../config/db";
 import {Response} from "express";
 import {AuthenticatedRequest} from "../middlewares/auth.middleware";
+import {buildPaginationMeta, parsePagination} from "../utils/pagination.utils";
+import {sanitizeUser} from "../utils/response.utils";
 
 export const getMe = async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -17,8 +19,7 @@ export const getMe = async (req: AuthenticatedRequest, res: Response) => {
             return res.status(404).json({message: "Người dùng không tồn tại"});
         }
 
-        const {password_hash: _passwordHash, ...safeUser} = user;
-        return res.status(200).json({user: safeUser});
+        return res.status(200).json({user: sanitizeUser(user)});
     } catch (error) {
         return res.status(500).json({message: "Lỗi hệ thống"});
     }
@@ -46,8 +47,7 @@ export const updateMe = async (req: AuthenticatedRequest, res: Response) => {
             data: updateData
         });
 
-        const {password_hash: _passwordHash, ...safeUser} = updatedUser;
-        return res.status(200).json({message: "Cập nhật hồ sơ thành công", user: safeUser});
+        return res.status(200).json({message: "Cập nhật hồ sơ thành công", user: sanitizeUser(updatedUser)});
     } catch (error) {
         return res.status(500).json({message: "Lỗi hệ thống"});
     }
@@ -78,8 +78,7 @@ export const getUserById = async (req: AuthenticatedRequest, res: Response) => {
 
 export const getUsers = async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const page = Math.max(1, parseInt(req.query.page as string) || 1);
-        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 10));
+        const {page, limit, skip, take} = parsePagination(req.query);
         const q = (req.query.q as string)?.trim();
 
         const whereCondition = q
@@ -94,8 +93,8 @@ export const getUsers = async (req: AuthenticatedRequest, res: Response) => {
         const total = await prisma.users.count({where: whereCondition});
         const users = await prisma.users.findMany({
             where: whereCondition,
-            skip: (page - 1) * limit,
-            take: limit,
+            skip,
+            take,
             orderBy: {created_at: "desc"},
             select: {
                 id: true,
@@ -109,12 +108,7 @@ export const getUsers = async (req: AuthenticatedRequest, res: Response) => {
 
         return res.status(200).json({
             users,
-            pagination: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit)
-            }
+            pagination: buildPaginationMeta(total, page, limit)
         });
     } catch (error) {
         return res.status(500).json({message: "Lỗi hệ thống"});
@@ -136,8 +130,7 @@ export const updateUserRole = async (req: AuthenticatedRequest, res: Response) =
             data: {role}
         });
 
-        const {password_hash: _passwordHash, ...safeUser} = updatedUser;
-        return res.status(200).json({message: "Cập nhật vai trò người dùng thành công", user: safeUser});
+        return res.status(200).json({message: "Cập nhật vai trò người dùng thành công", user: sanitizeUser(updatedUser)});
     } catch (error) {
         return res.status(500).json({message: "Lỗi hệ thống"});
     }
