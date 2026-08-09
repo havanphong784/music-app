@@ -6,6 +6,7 @@ import artistRoute from "./artist.route";
 import albumRoute from "./album.route";
 import trackRoute from "./track.route";
 import genreRoute from "./genre.route";
+import playlistRoute from "./playlist.route";
 
 const router = express.Router();
 
@@ -16,5 +17,6 @@ router.use("/artists", artistRoute);
 router.use("/albums", albumRoute);
 router.use("/tracks", trackRoute);
 router.use("/genres", genreRoute);
+router.use("/playlists", playlistRoute);
 
 export default router;

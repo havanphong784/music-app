@@ -50,6 +50,8 @@ export const uploadToCloudinary = async (req: AuthenticatedRequest, res: Respons
             folder = "albums";
         } else if (url.includes("artists")) {
             folder = "artists";
+        } else if (url.includes("playlists")) {
+            folder = "playlists";
         } else if (isAudio) {
             folder = "tracks";
             resource_type = "video";
