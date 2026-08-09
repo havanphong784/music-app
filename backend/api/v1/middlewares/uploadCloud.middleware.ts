@@ -39,11 +39,19 @@ export const uploadToCloudinary = async (req: AuthenticatedRequest, res: Respons
     }
 
     try {
+        const url = req.originalUrl || req.baseUrl || "";
+        let folder = "avatars";
+        if (url.includes("albums")) {
+            folder = "albums";
+        } else if (url.includes("artists")) {
+            folder = "artists";
+        }
+
         const streamUpload = (fileBuffer: Buffer): Promise<{secure_url: string}> => {
             return new Promise((resolve, reject) => {
                 const stream = cloudinary.uploader.upload_stream(
                     {
-                        folder: "avatars",
+                        folder,
                         resource_type: "image"
                     },
                     (error, result) => {
@@ -60,6 +68,7 @@ export const uploadToCloudinary = async (req: AuthenticatedRequest, res: Respons
 
         const result = await streamUpload(req.file.buffer);
         req.body.avatar_url = result.secure_url;
+        req.body.cover_url = result.secure_url;
         next();
     } catch (error) {
         return res.status(500).json({message: "Lỗi khi tải ảnh lên Cloudinary"});
