@@ -3,3 +3,4 @@
 /backend/package-lock.json
 /backend/generated/
 /api.md
+/backend/.env

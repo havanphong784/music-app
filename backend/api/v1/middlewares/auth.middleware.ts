@@ -1,5 +1,6 @@
 import {NextFunction, Request, Response} from "express";
 import {IPayload, verifyAccessToken} from "../utils/jwt.utils";
+import prisma from "../../../config/db";
 
 export interface AuthenticatedRequest extends Request {
     user?: IPayload;
@@ -37,3 +38,33 @@ export const requireRole = (requiredRole: string) => {
 };
 
 export const requireAdmin = requireRole("admin");
+
+export const requireArtistManagerOrAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+        return res.status(401).json({message: "Chưa xác thực"});
+    }
+
+    if (req.user.role === "admin") {
+        return next();
+    }
+
+    const artistId = (req.params.id || req.params.artistId) as string;
+    if (!artistId) {
+        return res.status(400).json({message: "Thiếu ID nghệ sĩ"});
+    }
+
+    const member = await prisma.artist_members.findUnique({
+        where: {
+            user_id_artist_id: {
+                user_id: req.user.userId,
+                artist_id: artistId
+            }
+        }
+    });
+
+    if (!member) {
+        return res.status(403).json({message: "Bạn không có quyền quản lý nghệ sĩ này"});
+    }
+
+    next();
+};
