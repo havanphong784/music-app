@@ -2,6 +2,7 @@ import prisma from "../../../config/db";
 import {Response} from "express";
 import {AuthenticatedRequest} from "../middlewares/auth.middleware";
 import {buildPaginationMeta, parsePagination} from "../utils/pagination.utils";
+import {formatTrack} from "../utils/response.utils";
 
 export const getArtists = async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -82,7 +83,7 @@ export const getArtistTracks = async (req: AuthenticatedRequest, res: Response) 
             }
         });
 
-        const tracks = trackArtists.map(ta => ta.tracks).filter(Boolean);
+        const tracks = trackArtists.map(ta => formatTrack(ta.tracks)).filter(Boolean);
         return res.status(200).json({tracks});
     } catch (error) {
         return res.status(500).json({message: "Lỗi hệ thống"});

@@ -2,6 +2,7 @@ import prisma from "../../../config/db";
 import {Response} from "express";
 import {AuthenticatedRequest} from "../middlewares/auth.middleware";
 import {buildPaginationMeta, parsePagination} from "../utils/pagination.utils";
+import {formatTrack} from "../utils/response.utils";
 
 export const getAlbums = async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -69,7 +70,12 @@ export const getAlbumById = async (req: AuthenticatedRequest, res: Response) => 
             return res.status(404).json({message: "Album không tồn tại"});
         }
 
-        return res.status(200).json({album});
+        return res.status(200).json({
+            album: {
+                ...album,
+                tracks: album.tracks.map(formatTrack)
+            }
+        });
     } catch (error) {
         return res.status(500).json({message: "Lỗi hệ thống"});
     }

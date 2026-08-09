@@ -46,7 +46,7 @@ export const streamTrack = async (req: Request, res: Response, next: NextFunctio
 };
 
 export const createTrack = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
-    const {title, duration_seconds, audio_url, album_id} = req.body;
+    const {title, duration_seconds, audio_url, album_id, artist_id} = req.body;
     const hasFile = !!req.file;
 
     if (!title || typeof title !== "string" || !title.trim() || title.trim().length > 255) {
@@ -57,12 +57,16 @@ export const createTrack = async (req: Request, res: Response, next: NextFunctio
         return res.status(400).json({message: "Cần cung cấp audio_url hoặc upload file âm thanh"});
     }
 
-    if (duration_seconds !== undefined && (isNaN(Number(duration_seconds)) || Number(duration_seconds) < 0)) {
-        return res.status(400).json({message: "Thời lượng bài hát (duration_seconds) phải là số dương"});
+    if (duration_seconds !== undefined && (isNaN(Number(duration_seconds)) || !Number.isInteger(Number(duration_seconds)) || Number(duration_seconds) < 0)) {
+        return res.status(400).json({message: "Thời lượng bài hát (duration_seconds) phải là số nguyên không âm"});
     }
 
     if (album_id !== undefined && album_id !== null && (typeof album_id !== "string" || !validator.isUUID(album_id))) {
         return res.status(400).json({message: "album_id không đúng định dạng UUID"});
+    }
+
+    if (artist_id !== undefined && (typeof artist_id !== "string" || !validator.isUUID(artist_id))) {
+        return res.status(400).json({message: "artist_id không đúng định dạng UUID"});
     }
 
     next();
@@ -87,8 +91,8 @@ export const updateTrack = async (req: Request, res: Response, next: NextFunctio
         }
     }
 
-    if (duration_seconds !== undefined && (isNaN(Number(duration_seconds)) || Number(duration_seconds) < 0)) {
-        return res.status(400).json({message: "Thời lượng bài hát (duration_seconds) phải là số dương"});
+    if (duration_seconds !== undefined && (isNaN(Number(duration_seconds)) || !Number.isInteger(Number(duration_seconds)) || Number(duration_seconds) < 0)) {
+        return res.status(400).json({message: "Thời lượng bài hát (duration_seconds) phải là số nguyên không âm"});
     }
 
     if (album_id !== undefined && album_id !== null && (typeof album_id !== "string" || !validator.isUUID(album_id))) {

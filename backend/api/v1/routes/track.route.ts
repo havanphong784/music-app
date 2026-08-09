@@ -1,5 +1,7 @@
 import express from "express";
-import {optionalAuth, requireAuth} from "../middlewares/auth.middleware";
+import {optionalAuth, requireAuth, requireTrackCreatorOrAdmin, requireTrackManagerOrAdmin} from "../middlewares/auth.middleware";
+import {limitTrackPlays} from "../middlewares/playback.middleware";
+import {requireValidTrackReferences} from "../middlewares/track.middleware";
 import {uploadSingle, uploadToCloudinary} from "../middlewares/uploadCloud.middleware";
 import * as validate from "../validates/track.validate";
 import * as controller from "../controllers/track.controller";
@@ -13,8 +15,10 @@ router.get("/:id/stream", validate.streamTrack, controller.streamTrack);
 router.post(
     "/",
     requireAuth,
-    uploadSingle("audio"),
+    uploadSingle("audio", "audio"),
     validate.createTrack,
+    requireValidTrackReferences,
+    requireTrackCreatorOrAdmin,
     uploadToCloudinary,
     controller.createTrack
 );
@@ -22,20 +26,23 @@ router.post(
 router.patch(
     "/:id",
     requireAuth,
-    uploadSingle("audio"),
+    validate.getTrackById,
+    requireTrackManagerOrAdmin,
+    uploadSingle("audio", "audio"),
     validate.updateTrack,
+    requireValidTrackReferences,
     uploadToCloudinary,
     controller.updateTrack
 );
 
-router.delete("/:id", requireAuth, validate.getTrackById, controller.deleteTrack);
+router.delete("/:id", requireAuth, validate.getTrackById, requireTrackManagerOrAdmin, controller.deleteTrack);
 
-router.post("/:id/play", optionalAuth, validate.getTrackById, controller.recordPlay);
+router.post("/:id/play", optionalAuth, validate.getTrackById, limitTrackPlays, controller.recordPlay);
 
-router.post("/:id/artists", requireAuth, validate.addTrackArtist, controller.addTrackArtist);
-router.delete("/:id/artists/:artistId", requireAuth, validate.removeTrackArtist, controller.removeTrackArtist);
+router.post("/:id/artists", requireAuth, validate.addTrackArtist, requireTrackManagerOrAdmin, controller.addTrackArtist);
+router.delete("/:id/artists/:artistId", requireAuth, validate.removeTrackArtist, requireTrackManagerOrAdmin, controller.removeTrackArtist);
 
-router.post("/:id/genres", requireAuth, validate.addTrackGenre, controller.addTrackGenre);
-router.delete("/:id/genres/:genreId", requireAuth, validate.removeTrackGenre, controller.removeTrackGenre);
+router.post("/:id/genres", requireAuth, validate.addTrackGenre, requireTrackManagerOrAdmin, controller.addTrackGenre);
+router.delete("/:id/genres/:genreId", requireAuth, validate.removeTrackGenre, requireTrackManagerOrAdmin, controller.removeTrackGenre);
 
 export default router;

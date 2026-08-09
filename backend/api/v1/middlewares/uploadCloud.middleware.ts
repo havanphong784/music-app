@@ -4,22 +4,28 @@ import cloudinary from "../../../config/cloudinary";
 import {AuthenticatedRequest} from "./auth.middleware";
 
 const storage = multer.memoryStorage();
-const upload = multer({
-    storage,
-    limits: {
-        fileSize: 50 * 1024 * 1024 // 50MB max for audio/image
-    },
-    fileFilter: (_req, file, cb) => {
-        if (file.mimetype.startsWith("image/") || file.mimetype.startsWith("audio/") || file.mimetype.startsWith("video/")) {
-            cb(null, true);
-        } else {
-            cb(new Error("Chỉ chấp nhận file định dạng hình ảnh hoặc âm thanh"));
-        }
-    }
-});
 
-export const uploadSingle = (fieldName: string) => {
+type UploadMediaType = "image" | "audio";
+
+export const isAllowedMimeType = (mimeType: string, mediaType: UploadMediaType) =>
+    mimeType.startsWith(`${mediaType}/`);
+
+export const uploadSingle = (fieldName: string, mediaType: UploadMediaType) => {
     return (req: Request, res: Response, next: NextFunction) => {
+        const upload = multer({
+            storage,
+            limits: {
+                fileSize: mediaType === "audio" ? 50 * 1024 * 1024 : 10 * 1024 * 1024
+            },
+            fileFilter: (_req, file, cb) => {
+                if (isAllowedMimeType(file.mimetype, mediaType)) {
+                    return cb(null, true);
+                }
+                cb(new Error(mediaType === "audio"
+                    ? "Chỉ chấp nhận file âm thanh"
+                    : "Chỉ chấp nhận file hình ảnh"));
+            }
+        });
         const uploadHandler = upload.single(fieldName);
         uploadHandler(req, res, (err: any) => {
             if (err) {
@@ -40,7 +46,7 @@ export const uploadToCloudinary = async (req: AuthenticatedRequest, res: Respons
 
     try {
         const url = req.originalUrl || req.baseUrl || "";
-        const isAudio = req.file.mimetype.startsWith("audio/") || req.file.mimetype.startsWith("video/") || url.includes("tracks");
+        const isAudio = req.file.mimetype.startsWith("audio/");
 
         let folder = "avatars";
         let resource_type: "image" | "video" | "raw" | "auto" = "image";

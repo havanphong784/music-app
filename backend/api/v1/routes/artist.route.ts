@@ -11,7 +11,7 @@ router.post(
     "/",
     requireAuth,
     requireAdmin,
-    uploadSingle("avatar"),
+    uploadSingle("avatar", "image"),
     validate.createArtist,
     uploadToCloudinary,
     controller.createArtist
@@ -21,8 +21,9 @@ router.get("/:id", validate.getArtistById, controller.getArtistById);
 router.patch(
     "/:id",
     requireAuth,
+    validate.getArtistById,
     requireArtistManagerOrAdmin,
-    uploadSingle("avatar"),
+    uploadSingle("avatar", "image"),
     validate.updateArtist,
     uploadToCloudinary,
     controller.updateArtist
@@ -32,13 +33,13 @@ router.delete("/:id", requireAuth, requireAdmin, validate.getArtistById, control
 router.get("/:id/tracks", validate.getArtistById, controller.getArtistTracks);
 router.get("/:id/albums", validate.getArtistById, controller.getArtistAlbums);
 
-router.get("/:id/members", requireAuth, requireArtistManagerOrAdmin, validate.getArtistById, controller.getArtistMembers);
-router.post("/:id/members", requireAuth, requireArtistManagerOrAdmin, validate.addMember, controller.addArtistMember);
+router.get("/:id/members", requireAuth, validate.getArtistById, requireArtistManagerOrAdmin, controller.getArtistMembers);
+router.post("/:id/members", requireAuth, validate.addMember, requireArtistManagerOrAdmin, controller.addArtistMember);
 router.delete(
     "/:id/members/:userId",
     requireAuth,
-    requireArtistManagerOrAdmin,
     validate.removeMember,
+    requireArtistManagerOrAdmin,
     controller.removeArtistMember
 );
 

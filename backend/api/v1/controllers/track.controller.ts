@@ -145,25 +145,29 @@ export const createTrack = async (req: AuthenticatedRequest, res: Response) => {
             }
         }
 
-        const track = await prisma.tracks.create({
-            data: {
-                title: title.trim(),
-                duration_seconds: Number(duration_seconds) || 0,
-                audio_url: audio_url || "",
-                lyrics: parsedLyrics,
-                album_id: album_id || null
-            }
-        });
-
-        if (artist_id) {
-            await prisma.track_artists.create({
+        const track = await prisma.$transaction(async tx => {
+            const createdTrack = await tx.tracks.create({
                 data: {
-                    track_id: track.id,
-                    artist_id,
-                    role: "primary"
+                    title: title.trim(),
+                    duration_seconds: Number(duration_seconds) || 0,
+                    audio_url: audio_url || "",
+                    lyrics: parsedLyrics,
+                    album_id: album_id || null
                 }
             });
-        }
+
+            if (artist_id) {
+                await tx.track_artists.create({
+                    data: {
+                        track_id: createdTrack.id,
+                        artist_id,
+                        role: "primary"
+                    }
+                });
+            }
+
+            return createdTrack;
+        });
 
         return res.status(201).json({message: "Tạo bài hát mới thành công", track: formatTrack(track)});
     } catch (error) {

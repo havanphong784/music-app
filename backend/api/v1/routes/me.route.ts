@@ -12,7 +12,7 @@ router.get("/", requireAuth, userController.getMe);
 router.patch(
     "/",
     requireAuth,
-    uploadSingle("avatar"),
+    uploadSingle("avatar", "image"),
     userValidate.updateMe,
     uploadToCloudinary,
     userController.updateMe

@@ -74,70 +74,78 @@ export const login = async (req: Request, res: Response) => {
 };
 
 export const refresh = async (req: Request, res: Response) => {
-    const oldToken = req.cookies.refreshToken;
-    if (!oldToken) {
-        return res.status(401).json({message: "Thiếu refresh token"});
-    }
+    try {
+        const oldToken = req.cookies.refreshToken;
+        if (!oldToken) {
+            return res.status(401).json({message: "Thiếu refresh token"});
+        }
 
-    const payload = verifyRefreshToken(oldToken);
-    if (!payload || typeof payload.jti !== "string") {
-        return res.status(401).json({message: "Refresh token không hợp lệ"});
-    }
+        const payload = verifyRefreshToken(oldToken);
+        if (!payload || typeof payload.jti !== "string") {
+            return res.status(401).json({message: "Refresh token không hợp lệ"});
+        }
 
-    const valid = await consumeRefreshToken(payload.jti, oldToken);
-    if (!valid) {
-        res.clearCookie("refreshToken", {
-            path: "/api/v1/auth"
+        const valid = await consumeRefreshToken(payload.jti, oldToken);
+        if (!valid) {
+            res.clearCookie("refreshToken", {path: "/api/v1/auth"});
+            return res.status(401).json({message: "Refresh token đã hết hạn hoặc đã được sử dụng"});
+        }
+
+        const currentUser = await prisma.users.findUnique({
+            where: {id: payload.userId},
+            select: {id: true, email: true, display_name: true, role: true}
+        });
+        if (!currentUser) {
+            res.clearCookie("refreshToken", {path: "/api/v1/auth"});
+            return res.status(401).json({message: "Tài khoản không còn tồn tại"});
+        }
+
+        const tokenPayload = {
+            userId: currentUser.id,
+            email: currentUser.email,
+            userName: currentUser.display_name,
+            role: currentUser.role || "user"
+        };
+
+        const accessToken = generateAccessToken(tokenPayload);
+        const nextRefresh = generateRefreshToken(tokenPayload);
+
+        await saveRefreshToken(nextRefresh.jti, nextRefresh.token);
+
+        res.cookie("refreshToken", nextRefresh.token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            path: "/api/v1/auth",
+            maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
-        return res.status(401).json({
-            message: "Refresh token đã hết hạn hoặc đã được sử dụng"
-        });
+        return res.status(200).json({token: accessToken});
+    } catch (error) {
+        return res.status(500).json({message: "Lỗi hệ thống"});
     }
-
-    const tokenPayload = {
-        userId: payload.userId,
-        email: payload.email,
-        userName: payload.userName,
-        role: payload.role
-    };
-
-    const accessToken = generateAccessToken(tokenPayload);
-    const nextRefresh = generateRefreshToken(tokenPayload);
-
-    await saveRefreshToken(nextRefresh.jti, nextRefresh.token);
-
-    res.cookie("refreshToken", nextRefresh.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        path: "/api/v1/auth",
-        maxAge: 7 * 24 * 60 * 60 * 1000
-    });
-
-    return res.status(200).json({token: accessToken});
 };
 
 export const logout = async (req: Request, res: Response) => {
-    const refreshToken = req.cookies.refreshToken;
+    try {
+        const refreshToken = req.cookies.refreshToken;
 
-    if (refreshToken) {
-        const payload = verifyRefreshToken(refreshToken);
-        if (payload && typeof payload.jti === "string") {
-            await revokeRefreshToken(
-                payload.jti
-            );
+        if (refreshToken) {
+            const payload = verifyRefreshToken(refreshToken);
+            if (payload && typeof payload.jti === "string") {
+                await revokeRefreshToken(payload.jti);
+            }
         }
+
+        res.clearCookie("refreshToken", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            path: "/api/v1/auth"
+        });
+
+        return res.status(200).json({message: "Đăng xuất thành công"});
+    } catch (error) {
+        return res.status(500).json({message: "Lỗi hệ thống"});
     }
-
-    res.clearCookie("refreshToken", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        path: "/api/v1/auth"
-    });
-
-    return res.status(200).json({
-        message: "Đăng xuất thành công"
-    });
 };

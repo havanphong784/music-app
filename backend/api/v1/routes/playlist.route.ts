@@ -1,5 +1,5 @@
 import express from "express";
-import {optionalAuth, requireAuth} from "../middlewares/auth.middleware";
+import {optionalAuth, requireAuth, requirePlaylistOwnerOrAdmin} from "../middlewares/auth.middleware";
 import {uploadSingle, uploadToCloudinary} from "../middlewares/uploadCloud.middleware";
 import * as validate from "../validates/playlist.validate";
 import * as controller from "../controllers/playlist.controller";
@@ -12,7 +12,7 @@ router.get("/:id", optionalAuth, validate.getPlaylistById, controller.getPlaylis
 router.post(
     "/",
     requireAuth,
-    uploadSingle("cover"),
+    uploadSingle("cover", "image"),
     validate.createPlaylist,
     uploadToCloudinary,
     controller.createPlaylist
@@ -21,7 +21,9 @@ router.post(
 router.patch(
     "/:id",
     requireAuth,
-    uploadSingle("cover"),
+    validate.getPlaylistById,
+    requirePlaylistOwnerOrAdmin,
+    uploadSingle("cover", "image"),
     validate.updatePlaylist,
     uploadToCloudinary,
     controller.updatePlaylist
