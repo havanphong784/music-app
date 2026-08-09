@@ -8,18 +8,23 @@ datasource db {
 }
 
 model albums {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title        String    @db.VarChar(255)
-  cover_url    String?
-  release_date DateTime? @db.Date
-  created_at   DateTime? @default(now()) @db.Timestamptz(6)
-  tracks       tracks[]
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  artist_id       String?   @db.Uuid
+  title           String    @db.VarChar(255)
+  cover_url       String?
+  cover_public_id String?
+  release_date    DateTime? @db.Date
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  tracks          tracks[]
+  artists         artists?  @relation(fields: [artist_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([artist_id], map: "idx_albums_artist")
 }
 
 model artist_members {
   user_id    String    @db.Uuid
   artist_id  String    @db.Uuid
-  role       String?   @default("manager") @db.VarChar(50)
+  role       String    @default("manager") @db.VarChar(50)
   created_at DateTime? @default(now()) @db.Timestamptz(6)
   artists    artists   @relation(fields: [artist_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -31,11 +36,13 @@ model artists {
   id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                  String                  @db.VarChar(255)
   avatar_url            String?
+  avatar_public_id      String?
   bio                   String?
   verified              Boolean?                @default(false)
   artist_members        artist_members[]
   track_artists         track_artists[]
   user_followed_artists user_followed_artists[]
+  albums                albums[]
 }
 
 model genres {
@@ -65,6 +72,7 @@ model playlist_tracks {
   tracks      tracks    @relation(fields: [track_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([playlist_id, track_id])
+  @@unique([playlist_id, position], map: "uq_playlist_tracks_position")
 }
 
 model playlists {
@@ -72,6 +80,7 @@ model playlists {
   user_id         String            @db.Uuid
   title           String            @db.VarChar(255)
   cover_url       String?
+  cover_public_id String?
   is_public       Boolean?          @default(true)
   created_at      DateTime?         @default(now()) @db.Timestamptz(6)
   playlist_tracks playlist_tracks[]
@@ -104,6 +113,7 @@ model tracks {
   title                String                 @db.VarChar(255)
   duration_seconds     Int
   audio_url            String
+  audio_public_id      String?
   lyrics               Json?
   play_count           BigInt?                @default(0)
   created_at           DateTime?              @default(now()) @db.Timestamptz(6)
@@ -143,6 +153,7 @@ model users {
   password_hash         String                  @db.VarChar(255)
   display_name          String                  @db.VarChar(100)
   avatar_url            String?
+  avatar_public_id      String?
   role                  String?                 @default("user") @db.VarChar(20)
   created_at            DateTime?               @default(now()) @db.Timestamptz(6)
   artist_members        artist_members[]

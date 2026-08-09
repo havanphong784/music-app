@@ -1,5 +1,5 @@
 import express from "express";
-import {requireAdmin, requireAuth} from "../middlewares/auth.middleware";
+import {requireAlbumCreatorOrAdmin, requireAlbumManagerOrAdmin, requireAlbumReassignmentPermission, requireAuth} from "../middlewares/auth.middleware";
 import {uploadSingle, uploadToCloudinary} from "../middlewares/uploadCloud.middleware";
 import * as validate from "../validates/album.validate";
 import * as controller from "../controllers/album.controller";
@@ -12,9 +12,9 @@ router.get("/:id", validate.getAlbumById, controller.getAlbumById);
 router.post(
     "/",
     requireAuth,
-    requireAdmin,
     uploadSingle("cover", "image"),
     validate.createAlbum,
+    requireAlbumCreatorOrAdmin,
     uploadToCloudinary,
     controller.createAlbum
 );
@@ -22,13 +22,15 @@ router.post(
 router.patch(
     "/:id",
     requireAuth,
-    requireAdmin,
+    validate.getAlbumById,
+    requireAlbumManagerOrAdmin,
     uploadSingle("cover", "image"),
     validate.updateAlbum,
+    requireAlbumReassignmentPermission,
     uploadToCloudinary,
     controller.updateAlbum
 );
 
-router.delete("/:id", requireAuth, requireAdmin, validate.getAlbumById, controller.deleteAlbum);
+router.delete("/:id", requireAuth, validate.getAlbumById, requireAlbumManagerOrAdmin, controller.deleteAlbum);
 
 export default router;

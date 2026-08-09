@@ -36,7 +36,7 @@ export const getArtistById = async (req: Request, res: Response, next: NextFunct
 };
 
 export const createArtist = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
-    const {name, bio, avatar_url} = req.body;
+    const {name, bio, avatar_url, verified} = req.body;
 
     if (!name || typeof name !== "string" || !name.trim() || name.trim().length > 255) {
         return res.status(400).json({message: "Tên nghệ sĩ không được để trống và tối đa 255 ký tự"});
@@ -50,6 +50,10 @@ export const createArtist = async (req: Request, res: Response, next: NextFuncti
         if (typeof avatar_url !== "string" || !validator.isURL(avatar_url)) {
             return res.status(400).json({message: "Đường dẫn ảnh đại diện không hợp lệ"});
         }
+    }
+
+    if (verified !== undefined && typeof verified !== "boolean" && verified !== "true" && verified !== "false") {
+        return res.status(400).json({message: "verified phải là boolean"});
     }
 
     next();
@@ -84,6 +88,10 @@ export const updateArtist = async (req: Request, res: Response, next: NextFuncti
         }
     }
 
+    if (verified !== undefined && typeof verified !== "boolean" && verified !== "true" && verified !== "false") {
+        return res.status(400).json({message: "verified phải là boolean"});
+    }
+
     next();
 };
 
@@ -99,8 +107,8 @@ export const addMember = async (req: Request, res: Response, next: NextFunction)
         return res.status(400).json({message: "user_id không đúng định dạng UUID"});
     }
 
-    if (role !== undefined && (typeof role !== "string" || role.length > 50)) {
-        return res.status(400).json({message: "Vai trò (role) tối đa 50 ký tự"});
+    if (role !== undefined && role !== "manager") {
+        return res.status(400).json({message: "Vai trò (role) chỉ chấp nhận 'manager'"});
     }
 
     next();

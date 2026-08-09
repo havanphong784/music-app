@@ -1,5 +1,5 @@
 import express from "express";
-import {requireAdmin, requireArtistManagerOrAdmin, requireAuth} from "../middlewares/auth.middleware";
+import {requireAdmin, requireArtistManagerOrAdmin, requireArtistVerificationPermission, requireAuth} from "../middlewares/auth.middleware";
 import {uploadSingle, uploadToCloudinary} from "../middlewares/uploadCloud.middleware";
 import * as validate from "../validates/artist.validate";
 import * as controller from "../controllers/artist.controller";
@@ -25,6 +25,7 @@ router.patch(
     requireArtistManagerOrAdmin,
     uploadSingle("avatar", "image"),
     validate.updateArtist,
+    requireArtistVerificationPermission,
     uploadToCloudinary,
     controller.updateArtist
 );
@@ -34,12 +35,12 @@ router.get("/:id/tracks", validate.getArtistById, controller.getArtistTracks);
 router.get("/:id/albums", validate.getArtistById, controller.getArtistAlbums);
 
 router.get("/:id/members", requireAuth, validate.getArtistById, requireArtistManagerOrAdmin, controller.getArtistMembers);
-router.post("/:id/members", requireAuth, validate.addMember, requireArtistManagerOrAdmin, controller.addArtistMember);
+router.post("/:id/members", requireAuth, requireAdmin, validate.addMember, controller.addArtistMember);
 router.delete(
     "/:id/members/:userId",
     requireAuth,
+    requireAdmin,
     validate.removeMember,
-    requireArtistManagerOrAdmin,
     controller.removeArtistMember
 );
 

@@ -37,16 +37,20 @@ export const getAlbumById = async (req: Request, res: Response, next: NextFuncti
 };
 
 export const createAlbum = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
-    const {title, release_date, cover_url} = req.body;
+    const {title, release_date, cover_url, artist_id} = req.body;
 
     if (!title || typeof title !== "string" || !title.trim() || title.trim().length > 255) {
         return res.status(400).json({message: "Tiêu đề album (title) không được để trống và tối đa 255 ký tự"});
     }
 
     if (release_date !== undefined && release_date !== null && release_date !== "") {
-        if (typeof release_date !== "string" || isNaN(Date.parse(release_date))) {
-            return res.status(400).json({message: "Ngày phát hành (release_date) không đúng định dạng ngày tháng"});
+        if (typeof release_date !== "string" || !validator.isDate(release_date, {format: "YYYY-MM-DD", strictMode: true})) {
+            return res.status(400).json({message: "Ngày phát hành (release_date) phải có định dạng YYYY-MM-DD"});
         }
+    }
+
+    if (artist_id !== undefined && artist_id !== null && (typeof artist_id !== "string" || !validator.isUUID(artist_id))) {
+        return res.status(400).json({message: "artist_id không đúng định dạng UUID"});
     }
 
     if (cover_url !== undefined && cover_url !== null && cover_url !== "") {
@@ -60,15 +64,15 @@ export const createAlbum = async (req: Request, res: Response, next: NextFunctio
 
 export const updateAlbum = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
     const {id} = req.params;
-    const {title, release_date, cover_url} = req.body;
+    const {title, release_date, cover_url, artist_id} = req.body;
     const hasFile = !!req.file;
 
     if (!id || typeof id !== "string" || !validator.isUUID(id)) {
         return res.status(400).json({message: "ID album không đúng định dạng UUID"});
     }
 
-    if (title === undefined && release_date === undefined && cover_url === undefined && !hasFile) {
-        return res.status(400).json({message: "Cần cung cấp ít nhất một thông tin để cập nhật (title, release_date, cover_url hoặc file ảnh)"});
+    if (title === undefined && release_date === undefined && cover_url === undefined && artist_id === undefined && !hasFile) {
+        return res.status(400).json({message: "Cần cung cấp ít nhất một thông tin để cập nhật"});
     }
 
     if (title !== undefined) {
@@ -78,9 +82,13 @@ export const updateAlbum = async (req: Request, res: Response, next: NextFunctio
     }
 
     if (release_date !== undefined && release_date !== null && release_date !== "") {
-        if (typeof release_date !== "string" || isNaN(Date.parse(release_date))) {
-            return res.status(400).json({message: "Ngày phát hành (release_date) không đúng định dạng ngày tháng"});
+        if (typeof release_date !== "string" || !validator.isDate(release_date, {format: "YYYY-MM-DD", strictMode: true})) {
+            return res.status(400).json({message: "Ngày phát hành (release_date) phải có định dạng YYYY-MM-DD"});
         }
+    }
+
+    if (artist_id !== undefined && artist_id !== null && (typeof artist_id !== "string" || !validator.isUUID(artist_id))) {
+        return res.status(400).json({message: "artist_id không đúng định dạng UUID"});
     }
 
     if (cover_url !== undefined && cover_url !== null && cover_url !== "") {

@@ -3,6 +3,7 @@ import {Response} from "express";
 import {AuthenticatedRequest} from "../middlewares/auth.middleware";
 import {buildPaginationMeta, parsePagination} from "../utils/pagination.utils";
 import {formatTrack} from "../utils/response.utils";
+import {destroyStoredAsset} from "../utils/cloudinaryAsset.utils";
 
 export const getArtists = async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -128,6 +129,7 @@ export const createArtist = async (req: AuthenticatedRequest, res: Response) => 
                 name: name.trim(),
                 bio: bio ? bio.trim() : null,
                 avatar_url: avatar_url || null,
+                avatar_public_id: req.uploadedAsset?.publicId || null,
                 verified: String(verified) === "true"
             }
         });
@@ -152,6 +154,8 @@ export const updateArtist = async (req: AuthenticatedRequest, res: Response) => 
         if (name !== undefined) updateData.name = name.trim();
         if (bio !== undefined) updateData.bio = bio ? bio.trim() : null;
         if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
+        if (req.uploadedAsset) updateData.avatar_public_id = req.uploadedAsset.publicId;
+        else if (avatar_url !== undefined) updateData.avatar_public_id = null;
         if (verified !== undefined && req.user?.role === "admin") {
             updateData.verified = String(verified) === "true";
         }
@@ -160,6 +164,10 @@ export const updateArtist = async (req: AuthenticatedRequest, res: Response) => 
             where: {id},
             data: updateData
         });
+
+        if (existArtist.avatar_public_id !== updatedArtist.avatar_public_id) {
+            await destroyStoredAsset(existArtist.avatar_public_id, "image");
+        }
 
         return res.status(200).json({message: "Cập nhật thông tin nghệ sĩ thành công", artist: updatedArtist});
     } catch (error) {
@@ -176,6 +184,7 @@ export const deleteArtist = async (req: AuthenticatedRequest, res: Response) => 
         }
 
         await prisma.artists.delete({where: {id}});
+        await destroyStoredAsset(existArtist.avatar_public_id, "image");
         return res.status(200).json({message: "Xóa hồ sơ nghệ sĩ thành công"});
     } catch (error) {
         return res.status(500).json({message: "Lỗi hệ thống"});

@@ -3,6 +3,26 @@ import {Response} from "express";
 import {AuthenticatedRequest} from "../middlewares/auth.middleware";
 import {buildPaginationMeta, parsePagination} from "../utils/pagination.utils";
 import {formatTrack} from "../utils/response.utils";
+import {destroyStoredAsset} from "../utils/cloudinaryAsset.utils";
+
+const rewritePlaylistPositions = async (tx: any, playlistId: string, orderedTrackIds: string[]) => {
+    for (let index = 0; index < orderedTrackIds.length; index++) {
+        await tx.playlist_tracks.update({
+            where: {playlist_id_track_id: {playlist_id: playlistId, track_id: orderedTrackIds[index]}},
+            data: {position: -(index + 1)}
+        });
+    }
+    for (let index = 0; index < orderedTrackIds.length; index++) {
+        await tx.playlist_tracks.update({
+            where: {playlist_id_track_id: {playlist_id: playlistId, track_id: orderedTrackIds[index]}},
+            data: {position: index + 1}
+        });
+    }
+};
+
+const lockPlaylist = async (tx: any, playlistId: string) => {
+    await tx.$queryRaw`SELECT "id" FROM "playlists" WHERE "id" = ${playlistId}::uuid FOR UPDATE`;
+};
 
 export const getPublicPlaylists = async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -55,6 +75,7 @@ export const createPlaylist = async (req: AuthenticatedRequest, res: Response) =
                 user_id: userId,
                 title: title.trim(),
                 cover_url: cover_url || null,
+                cover_public_id: req.uploadedAsset?.publicId || null,
                 is_public: isPublic
             }
         });
@@ -146,12 +167,18 @@ export const updatePlaylist = async (req: AuthenticatedRequest, res: Response) =
 
         if (title !== undefined) updateData.title = title.trim();
         if (cover_url !== undefined) updateData.cover_url = cover_url;
+        if (req.uploadedAsset) updateData.cover_public_id = req.uploadedAsset.publicId;
+        else if (cover_url !== undefined) updateData.cover_public_id = null;
         if (is_public !== undefined) updateData.is_public = String(is_public) === "true" || is_public === true;
 
         const updatedPlaylist = await prisma.playlists.update({
             where: {id},
             data: updateData
         });
+
+        if (existPlaylist.cover_public_id !== updatedPlaylist.cover_public_id) {
+            await destroyStoredAsset(existPlaylist.cover_public_id, "image");
+        }
 
         return res.status(200).json({message: "Cập nhật danh sách phát thành công", playlist: updatedPlaylist});
     } catch (error) {
@@ -175,6 +202,7 @@ export const deletePlaylist = async (req: AuthenticatedRequest, res: Response) =
         }
 
         await prisma.playlists.delete({where: {id}});
+        await destroyStoredAsset(existPlaylist.cover_public_id, "image");
         return res.status(200).json({message: "Xóa danh sách phát thành công"});
     } catch (error) {
         return res.status(500).json({message: "Lỗi hệ thống"});
@@ -202,30 +230,28 @@ export const addTrackToPlaylist = async (req: AuthenticatedRequest, res: Respons
             return res.status(404).json({message: "Bài hát không tồn tại"});
         }
 
-        let targetPosition = Number(position);
-        if (isNaN(targetPosition) || targetPosition < 1) {
-            const maxPos = await prisma.playlist_tracks.aggregate({
+        const playlistTrack = await prisma.$transaction(async tx => {
+            await lockPlaylist(tx, id);
+            const current = await tx.playlist_tracks.findMany({
                 where: {playlist_id: id},
-                _max: {position: true}
+                orderBy: [{position: "asc"}, {added_at: "asc"}],
+                select: {track_id: true}
             });
-            targetPosition = (maxPos._max.position || 0) + 1;
-        }
+            const orderedIds = current.map(item => item.track_id).filter(existingId => existingId !== track_id);
+            const requestedPosition = position === undefined ? orderedIds.length + 1 : Number(position);
+            const targetIndex = Math.min(Math.max(requestedPosition - 1, 0), orderedIds.length);
 
-        const playlistTrack = await prisma.playlist_tracks.upsert({
-            where: {
-                playlist_id_track_id: {
-                    playlist_id: id,
-                    track_id
-                }
-            },
-            update: {
-                position: targetPosition
-            },
-            create: {
-                playlist_id: id,
-                track_id,
-                position: targetPosition
+            if (!current.some(item => item.track_id === track_id)) {
+                await tx.playlist_tracks.create({
+                    data: {playlist_id: id, track_id, position: -(current.length + 1)}
+                });
             }
+
+            orderedIds.splice(targetIndex, 0, track_id);
+            await rewritePlaylistPositions(tx, id, orderedIds);
+            return tx.playlist_tracks.findUnique({
+                where: {playlist_id_track_id: {playlist_id: id, track_id}}
+            });
         });
 
         return res.status(201).json({message: "Thêm bài hát vào danh sách phát thành công", playlist_track: playlistTrack});
@@ -249,23 +275,25 @@ export const reorderPlaylistTracks = async (req: AuthenticatedRequest, res: Resp
             return res.status(403).json({message: "Bạn không có quyền quản lý danh sách phát này"});
         }
 
-        const {items} = req.body; // Array<{ track_id: string, position: number }>
+        const {items} = req.body as {items: Array<{track_id: string; position: number}>};
+        const current = await prisma.playlist_tracks.findMany({
+            where: {playlist_id: id},
+            select: {track_id: true}
+        });
+        const currentIds = new Set(current.map(item => item.track_id));
+        if (items.length !== current.length || items.some(item => !currentIds.has(item.track_id))) {
+            return res.status(400).json({message: "items phải chứa đầy đủ các bài hát hiện có trong playlist"});
+        }
 
-        await prisma.$transaction(
-            items.map((item: {track_id: string; position: number}) =>
-                prisma.playlist_tracks.update({
-                    where: {
-                        playlist_id_track_id: {
-                            playlist_id: id,
-                            track_id: item.track_id
-                        }
-                    },
-                    data: {
-                        position: Number(item.position)
-                    }
-                })
-            )
-        );
+        const orderedItems = [...items].sort((a, b) => Number(a.position) - Number(b.position));
+        if (orderedItems.some((item, index) => Number(item.position) !== index + 1)) {
+            return res.status(400).json({message: "position phải là dãy liên tục bắt đầu từ 1"});
+        }
+
+        await prisma.$transaction(async tx => {
+            await lockPlaylist(tx, id);
+            await rewritePlaylistPositions(tx, id, orderedItems.map(item => item.track_id));
+        });
 
         return res.status(200).json({message: "Cập nhật thứ tự bài hát thành công"});
     } catch (error) {
@@ -302,13 +330,17 @@ export const removeTrackFromPlaylist = async (req: AuthenticatedRequest, res: Re
             return res.status(404).json({message: "Bài hát không có trong danh sách phát"});
         }
 
-        await prisma.playlist_tracks.delete({
-            where: {
-                playlist_id_track_id: {
-                    playlist_id: id,
-                    track_id: trackId
-                }
-            }
+        await prisma.$transaction(async tx => {
+            await lockPlaylist(tx, id);
+            await tx.playlist_tracks.delete({
+                where: {playlist_id_track_id: {playlist_id: id, track_id: trackId}}
+            });
+            const remaining = await tx.playlist_tracks.findMany({
+                where: {playlist_id: id},
+                orderBy: [{position: "asc"}, {added_at: "asc"}],
+                select: {track_id: true}
+            });
+            await rewritePlaylistPositions(tx, id, remaining.map(item => item.track_id));
         });
 
         return res.status(200).json({message: "Đã xóa bài hát khỏi danh sách phát"});

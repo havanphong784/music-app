@@ -1,9 +1,11 @@
 import {NextFunction, Request, Response} from "express";
 import {IPayload, verifyAccessToken} from "../utils/jwt.utils";
 import prisma from "../../../config/db";
+import type {UploadedCloudinaryAsset} from "../utils/cloudinaryAsset.utils";
 
 export interface AuthenticatedRequest extends Request {
     user?: IPayload;
+    uploadedAsset?: UploadedCloudinaryAsset;
 }
 
 export const requireAuth = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -81,7 +83,7 @@ export const requireArtistManagerOrAdmin = async (req: AuthenticatedRequest, res
             }
         });
 
-        if (!member) {
+        if (!member || member.role !== "manager") {
             return res.status(403).json({message: "Bạn không có quyền quản lý nghệ sĩ này"});
         }
 
@@ -100,8 +102,9 @@ export const requireTrackManagerOrAdmin = async (req: AuthenticatedRequest, res:
         const managedTrack = await prisma.track_artists.findFirst({
             where: {
                 track_id: trackId,
+                role: "primary",
                 artists: {
-                    artist_members: {some: {user_id: req.user.userId}}
+                    artist_members: {some: {user_id: req.user.userId, role: "manager"}}
                 }
             },
             select: {track_id: true}
@@ -110,6 +113,31 @@ export const requireTrackManagerOrAdmin = async (req: AuthenticatedRequest, res:
         if (!managedTrack) {
             return res.status(403).json({message: "Bạn không có quyền quản lý bài hát này"});
         }
+        next();
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const requireArtistVerificationPermission = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (req.body.verified !== undefined && req.user?.role !== "admin") {
+        return res.status(403).json({message: "Chỉ Admin được thay đổi trạng thái xác minh"});
+    }
+    next();
+};
+
+export const requireAlbumReassignmentPermission = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (req.body.artist_id !== undefined && req.user?.role !== "admin") {
+        return res.status(403).json({message: "Chỉ Admin được chuyển album sang nghệ sĩ khác"});
+    }
+    if (!req.body.artist_id) return next();
+
+    try {
+        const artist = await prisma.artists.findUnique({
+            where: {id: req.body.artist_id as string},
+            select: {id: true}
+        });
+        if (!artist) return res.status(404).json({message: "Nghệ sĩ không tồn tại"});
         next();
     } catch (error) {
         next(error);
@@ -129,8 +157,59 @@ export const requireTrackCreatorOrAdmin = async (req: AuthenticatedRequest, res:
         const member = await prisma.artist_members.findUnique({
             where: {user_id_artist_id: {user_id: req.user.userId, artist_id: artistId}}
         });
-        if (!member) {
+        if (!member || member.role !== "manager") {
             return res.status(403).json({message: "Bạn không có quyền tạo bài hát cho nghệ sĩ này"});
+        }
+        next();
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const requireAlbumManagerOrAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) return res.status(401).json({message: "Chưa xác thực"});
+    if (req.user.role === "admin") return next();
+
+    try {
+        const album = await prisma.albums.findUnique({
+            where: {id: req.params.id as string},
+            select: {artist_id: true}
+        });
+        if (!album) return res.status(404).json({message: "Album không tồn tại"});
+        if (!album.artist_id) return res.status(403).json({message: "Album chưa được gán nghệ sĩ quản lý"});
+
+        const member = await prisma.artist_members.findUnique({
+            where: {user_id_artist_id: {user_id: req.user.userId, artist_id: album.artist_id}}
+        });
+        if (!member || member.role !== "manager") {
+            return res.status(403).json({message: "Bạn không có quyền quản lý album này"});
+        }
+        next();
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const requireAlbumCreatorOrAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) return res.status(401).json({message: "Chưa xác thực"});
+
+    const artistId = req.body.artist_id as string | undefined;
+    if (!artistId) {
+        return req.user.role === "admin"
+            ? next()
+            : res.status(400).json({message: "Artist Manager phải cung cấp artist_id"});
+    }
+
+    try {
+        const artist = await prisma.artists.findUnique({where: {id: artistId}, select: {id: true}});
+        if (!artist) return res.status(404).json({message: "Nghệ sĩ không tồn tại"});
+        if (req.user.role === "admin") return next();
+
+        const member = await prisma.artist_members.findUnique({
+            where: {user_id_artist_id: {user_id: req.user.userId, artist_id: artistId}}
+        });
+        if (!member || member.role !== "manager") {
+            return res.status(403).json({message: "Bạn không có quyền tạo album cho nghệ sĩ này"});
         }
         next();
     } catch (error) {

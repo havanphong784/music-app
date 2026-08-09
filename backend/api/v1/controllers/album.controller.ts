@@ -3,6 +3,7 @@ import {Response} from "express";
 import {AuthenticatedRequest} from "../middlewares/auth.middleware";
 import {buildPaginationMeta, parsePagination} from "../utils/pagination.utils";
 import {formatTrack} from "../utils/response.utils";
+import {destroyStoredAsset} from "../utils/cloudinaryAsset.utils";
 
 export const getAlbums = async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -83,12 +84,14 @@ export const getAlbumById = async (req: AuthenticatedRequest, res: Response) => 
 
 export const createAlbum = async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const {title, cover_url, release_date} = req.body;
+        const {title, cover_url, release_date, artist_id} = req.body;
 
         const album = await prisma.albums.create({
             data: {
                 title: title.trim(),
+                artist_id: artist_id || null,
                 cover_url: cover_url || null,
+                cover_public_id: req.uploadedAsset?.publicId || null,
                 release_date: release_date ? new Date(release_date) : null
             }
         });
@@ -102,7 +105,7 @@ export const createAlbum = async (req: AuthenticatedRequest, res: Response) => {
 export const updateAlbum = async (req: AuthenticatedRequest, res: Response) => {
     try {
         const id = req.params.id as string;
-        const {title, cover_url, release_date} = req.body;
+        const {title, cover_url, release_date, artist_id} = req.body;
 
         const existAlbum = await prisma.albums.findUnique({where: {id}});
         if (!existAlbum) {
@@ -112,12 +115,19 @@ export const updateAlbum = async (req: AuthenticatedRequest, res: Response) => {
         const updateData: any = {};
         if (title !== undefined) updateData.title = title.trim();
         if (cover_url !== undefined) updateData.cover_url = cover_url;
+        if (req.uploadedAsset) updateData.cover_public_id = req.uploadedAsset.publicId;
+        else if (cover_url !== undefined) updateData.cover_public_id = null;
         if (release_date !== undefined) updateData.release_date = release_date ? new Date(release_date) : null;
+        if (artist_id !== undefined) updateData.artist_id = artist_id || null;
 
         const updatedAlbum = await prisma.albums.update({
             where: {id},
             data: updateData
         });
+
+        if (existAlbum.cover_public_id !== updatedAlbum.cover_public_id) {
+            await destroyStoredAsset(existAlbum.cover_public_id, "image");
+        }
 
         return res.status(200).json({message: "Cập nhật thông tin album thành công", album: updatedAlbum});
     } catch (error) {
@@ -134,6 +144,7 @@ export const deleteAlbum = async (req: AuthenticatedRequest, res: Response) => {
         }
 
         await prisma.albums.delete({where: {id}});
+        await destroyStoredAsset(existAlbum.cover_public_id, "image");
         return res.status(200).json({message: "Xóa album thành công"});
     } catch (error) {
         return res.status(500).json({message: "Lỗi hệ thống"});

@@ -108,10 +108,12 @@ export const reorderTracks = async (req: Request, res: Response, next: NextFunct
         return res.status(400).json({message: "ID danh sách phát không đúng định dạng UUID"});
     }
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
+    if (!items || !Array.isArray(items) || items.length === 0 || items.length > 1000) {
         return res.status(400).json({message: "Danh sách bài hát cần sắp xếp (items) không được để trống"});
     }
 
+    const trackIds = new Set<string>();
+    const positions = new Set<number>();
     for (const item of items) {
         if (!item.track_id || typeof item.track_id !== "string" || !validator.isUUID(item.track_id)) {
             return res.status(400).json({message: "Mỗi phần tử items phải chứa track_id đúng định dạng UUID"});
@@ -119,6 +121,11 @@ export const reorderTracks = async (req: Request, res: Response, next: NextFunct
         if (item.position === undefined || isNaN(Number(item.position)) || !Number.isInteger(Number(item.position)) || Number(item.position) < 1) {
             return res.status(400).json({message: "Mỗi phần tử items phải chứa position là số nguyên dương"});
         }
+        if (trackIds.has(item.track_id) || positions.has(Number(item.position))) {
+            return res.status(400).json({message: "track_id và position trong items không được trùng lặp"});
+        }
+        trackIds.add(item.track_id);
+        positions.add(Number(item.position));
     }
 
     next();
