@@ -68,3 +68,17 @@ export const requireArtistManagerOrAdmin = async (req: AuthenticatedRequest, res
 
     next();
 };
+
+export const optionalAuth = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.split(" ")[1];
+        if (token) {
+            const user = verifyAccessToken(token);
+            if (user) {
+                req.user = user;
+            }
+        }
+    }
+    next();
+};
