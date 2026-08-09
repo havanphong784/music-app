@@ -2,6 +2,7 @@ import multer from "multer";
 import {NextFunction, Request, Response} from "express";
 import cloudinary from "../../../config/cloudinary";
 import {AuthenticatedRequest} from "./auth.middleware";
+import {destroyCloudinaryAsset, UploadedCloudinaryAsset} from "../utils/cloudinaryAsset.utils";
 
 const storage = multer.memoryStorage();
 
@@ -9,6 +10,22 @@ type UploadMediaType = "image" | "audio";
 
 export const isAllowedMimeType = (mimeType: string, mediaType: UploadMediaType) =>
     mimeType.startsWith(`${mediaType}/`);
+
+export const hasValidFileSignature = (buffer: Buffer, mediaType: UploadMediaType) => {
+    if (mediaType === "image") {
+        const png = buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+        const jpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+        const gif = buffer.subarray(0, 4).toString("ascii") === "GIF8";
+        const webp = buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP";
+        return png || jpeg || gif || webp;
+    }
+
+    const id3 = buffer.subarray(0, 3).toString("ascii") === "ID3";
+    const mp3Frame = buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0;
+    const wav = buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WAVE";
+    const flac = buffer.subarray(0, 4).toString("ascii") === "fLaC";
+    return id3 || mp3Frame || wav || flac;
+};
 
 export const uploadSingle = (fieldName: string, mediaType: UploadMediaType) => {
     return (req: Request, res: Response, next: NextFunction) => {
@@ -33,6 +50,9 @@ export const uploadSingle = (fieldName: string, mediaType: UploadMediaType) => {
                     return res.status(400).json({message: "Kích thước file vượt quá giới hạn cho phép"});
                 }
                 return res.status(400).json({message: err.message || "Lỗi khi upload file"});
+            }
+            if (req.file && !hasValidFileSignature(req.file.buffer, mediaType)) {
+                return res.status(400).json({message: "Nội dung file không khớp với định dạng cho phép"});
             }
             next();
         });
@@ -85,6 +105,20 @@ export const uploadToCloudinary = async (req: AuthenticatedRequest, res: Respons
         };
 
         const result = await streamUpload(req.file.buffer);
+        const uploadedAsset: UploadedCloudinaryAsset = {
+            publicId: result.public_id,
+            resourceType: isAudio ? "video" : "image",
+            deliveryType: isAudio ? "authenticated" : "upload"
+        };
+        req.uploadedAsset = uploadedAsset;
+        let responseFinished = false;
+        res.once("finish", () => {
+            responseFinished = true;
+            if (res.statusCode >= 400) void destroyCloudinaryAsset(uploadedAsset);
+        });
+        res.once("close", () => {
+            if (!responseFinished) void destroyCloudinaryAsset(uploadedAsset);
+        });
         if (isAudio) {
             // For private Cloudinary assets, store the public_id or secure_url
             req.body.audio_url = result.public_id;

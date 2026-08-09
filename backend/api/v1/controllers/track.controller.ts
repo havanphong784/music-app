@@ -4,6 +4,7 @@ import {AuthenticatedRequest} from "../middlewares/auth.middleware";
 import cloudinary from "../../../config/cloudinary";
 import {buildPaginationMeta, parsePagination} from "../utils/pagination.utils";
 import {formatTrack} from "../utils/response.utils";
+import {destroyStoredAsset} from "../utils/cloudinaryAsset.utils";
 
 export const getTracks = async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -107,6 +108,15 @@ export const streamTrack = async (req: AuthenticatedRequest, res: Response) => {
             return res.status(404).json({message: "Bài hát chưa có file âm thanh"});
         }
 
+        if (/^https:\/\//i.test(track.audio_url)) {
+            if (req.query.redirect === "true") return res.redirect(track.audio_url);
+            return res.status(200).json({
+                stream_url: track.audio_url,
+                expires_at: null,
+                expires_in_seconds: null
+            });
+        }
+
         // Compute expires_at timestamp 15 minutes in future (900 seconds)
         const expiresAt = Math.floor(Date.now() / 1000) + 15 * 60;
 
@@ -151,6 +161,7 @@ export const createTrack = async (req: AuthenticatedRequest, res: Response) => {
                     title: title.trim(),
                     duration_seconds: Number(duration_seconds) || 0,
                     audio_url: audio_url || "",
+                    audio_public_id: req.uploadedAsset?.publicId || null,
                     lyrics: parsedLyrics,
                     album_id: album_id || null
                 }
@@ -189,6 +200,8 @@ export const updateTrack = async (req: AuthenticatedRequest, res: Response) => {
         if (title !== undefined) updateData.title = title.trim();
         if (duration_seconds !== undefined) updateData.duration_seconds = Number(duration_seconds);
         if (audio_url !== undefined) updateData.audio_url = audio_url;
+        if (req.uploadedAsset) updateData.audio_public_id = req.uploadedAsset.publicId;
+        else if (audio_url !== undefined) updateData.audio_public_id = null;
         if (album_id !== undefined) updateData.album_id = album_id || null;
 
         if (lyrics !== undefined) {
@@ -203,6 +216,10 @@ export const updateTrack = async (req: AuthenticatedRequest, res: Response) => {
             where: {id},
             data: updateData
         });
+
+        if (existTrack.audio_public_id !== updatedTrack.audio_public_id) {
+            await destroyStoredAsset(existTrack.audio_public_id, "audio");
+        }
 
         return res.status(200).json({message: "Cập nhật bài hát thành công", track: formatTrack(updatedTrack)});
     } catch (error) {
@@ -219,6 +236,7 @@ export const deleteTrack = async (req: AuthenticatedRequest, res: Response) => {
         }
 
         await prisma.tracks.delete({where: {id}});
+        await destroyStoredAsset(existTrack.audio_public_id, "audio");
         return res.status(200).json({message: "Xóa bài hát thành công"});
     } catch (error) {
         return res.status(500).json({message: "Lỗi hệ thống"});
@@ -233,27 +251,30 @@ export const recordPlay = async (req: AuthenticatedRequest, res: Response) => {
             return res.status(404).json({message: "Bài hát không tồn tại"});
         }
 
-        const updatedTrack = await prisma.tracks.update({
-            where: {id},
-            data: {
-                play_count: {
-                    increment: 1
-                }
-            }
-        });
-
-        if (req.user?.userId) {
-            await prisma.play_history.create({
+        const updatedTrack = await prisma.$transaction(async tx => {
+            const updated = await tx.tracks.update({
+                where: {id},
                 data: {
-                    user_id: req.user.userId,
-                    track_id: id
+                    play_count: {
+                        increment: 1
+                    }
                 }
             });
-        }
+
+            if (req.user?.userId) {
+                await tx.play_history.create({
+                    data: {
+                        user_id: req.user.userId,
+                        track_id: id
+                    }
+                });
+            }
+            return updated;
+        });
 
         return res.status(200).json({
             message: "Ghi nhận lượt phát thành công",
-            play_count: Number(updatedTrack.play_count)
+            play_count: updatedTrack.play_count?.toString() || "0"
         });
     } catch (error) {
         return res.status(500).json({message: "Lỗi hệ thống"});
@@ -273,6 +294,16 @@ export const addTrackArtist = async (req: AuthenticatedRequest, res: Response) =
         const existArtist = await prisma.artists.findUnique({where: {id: artist_id}});
         if (!existArtist) {
             return res.status(404).json({message: "Nghệ sĩ không tồn tại"});
+        }
+
+        const existingRelation = await prisma.track_artists.findUnique({
+            where: {track_id_artist_id: {track_id: id, artist_id}}
+        });
+        if (existingRelation?.role === "primary" && role === "featured") {
+            const primaryCount = await prisma.track_artists.count({where: {track_id: id, role: "primary"}});
+            if (primaryCount <= 1) {
+                return res.status(400).json({message: "Bài hát phải có ít nhất một nghệ sĩ chính"});
+            }
         }
 
         const trackArtist = await prisma.track_artists.upsert({
@@ -314,6 +345,13 @@ export const removeTrackArtist = async (req: AuthenticatedRequest, res: Response
 
         if (!existTrackArtist) {
             return res.status(404).json({message: "Liên kết nghệ sĩ và bài hát không tồn tại"});
+        }
+
+        if (existTrackArtist.role === "primary") {
+            const primaryCount = await prisma.track_artists.count({where: {track_id: id, role: "primary"}});
+            if (primaryCount <= 1) {
+                return res.status(400).json({message: "Bài hát phải có ít nhất một nghệ sĩ chính"});
+            }
         }
 
         await prisma.track_artists.delete({

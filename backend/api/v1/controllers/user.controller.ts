@@ -3,6 +3,7 @@ import {Response} from "express";
 import {AuthenticatedRequest} from "../middlewares/auth.middleware";
 import {buildPaginationMeta, parsePagination} from "../utils/pagination.utils";
 import {sanitizeUser} from "../utils/response.utils";
+import {destroyStoredAsset} from "../utils/cloudinaryAsset.utils";
 
 export const getMe = async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -33,7 +34,7 @@ export const updateMe = async (req: AuthenticatedRequest, res: Response) => {
         }
 
         const {display_name, avatar_url} = req.body;
-        const updateData: {display_name?: string; avatar_url?: string | null} = {};
+        const updateData: {display_name?: string; avatar_url?: string | null; avatar_public_id?: string | null} = {};
 
         if (display_name !== undefined) {
             updateData.display_name = display_name.trim();
@@ -41,11 +42,20 @@ export const updateMe = async (req: AuthenticatedRequest, res: Response) => {
         if (avatar_url !== undefined) {
             updateData.avatar_url = avatar_url;
         }
+        if (req.uploadedAsset) updateData.avatar_public_id = req.uploadedAsset.publicId;
+        else if (avatar_url !== undefined) updateData.avatar_public_id = null;
+
+        const existingUser = await prisma.users.findUnique({where: {id: userId}, select: {avatar_public_id: true}});
+        if (!existingUser) return res.status(404).json({message: "Người dùng không tồn tại"});
 
         const updatedUser = await prisma.users.update({
             where: {id: userId},
             data: updateData
         });
+
+        if (existingUser.avatar_public_id !== updatedUser.avatar_public_id) {
+            await destroyStoredAsset(existingUser.avatar_public_id, "image");
+        }
 
         return res.status(200).json({message: "Cập nhật hồ sơ thành công", user: sanitizeUser(updatedUser)});
     } catch (error) {

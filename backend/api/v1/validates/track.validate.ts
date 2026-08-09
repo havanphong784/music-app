@@ -1,6 +1,24 @@
 import {NextFunction, Request, Response} from "express";
 import validator from "validator";
 
+const isValidAudioReference = (value: unknown) => {
+    if (typeof value !== "string" || !value.trim() || value.length > 255) return false;
+    if (/^https?:\/\//i.test(value)) {
+        return validator.isURL(value, {protocols: ["https"], require_protocol: true});
+    }
+    return /^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(value);
+};
+
+const isValidJsonValue = (value: unknown) => {
+    if (typeof value !== "string") return true;
+    try {
+        JSON.parse(value);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
 export const getTracks = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
     const {page, limit, album_id, genre_id} = req.query;
 
@@ -46,7 +64,7 @@ export const streamTrack = async (req: Request, res: Response, next: NextFunctio
 };
 
 export const createTrack = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
-    const {title, duration_seconds, audio_url, album_id, artist_id} = req.body;
+    const {title, duration_seconds, audio_url, album_id, artist_id, lyrics} = req.body;
     const hasFile = !!req.file;
 
     if (!title || typeof title !== "string" || !title.trim() || title.trim().length > 255) {
@@ -55,6 +73,14 @@ export const createTrack = async (req: Request, res: Response, next: NextFunctio
 
     if (!hasFile && (!audio_url || typeof audio_url !== "string" || !audio_url.trim())) {
         return res.status(400).json({message: "Cần cung cấp audio_url hoặc upload file âm thanh"});
+    }
+
+    if (audio_url !== undefined && !isValidAudioReference(audio_url)) {
+        return res.status(400).json({message: "audio_url phải là HTTPS URL hoặc Cloudinary public ID hợp lệ"});
+    }
+
+    if (lyrics !== undefined && lyrics !== null && !isValidJsonValue(lyrics)) {
+        return res.status(400).json({message: "lyrics phải là JSON hợp lệ"});
     }
 
     if (duration_seconds !== undefined && (isNaN(Number(duration_seconds)) || !Number.isInteger(Number(duration_seconds)) || Number(duration_seconds) < 0)) {
@@ -97,6 +123,14 @@ export const updateTrack = async (req: Request, res: Response, next: NextFunctio
 
     if (album_id !== undefined && album_id !== null && (typeof album_id !== "string" || !validator.isUUID(album_id))) {
         return res.status(400).json({message: "album_id không đúng định dạng UUID"});
+    }
+
+    if (audio_url !== undefined && !isValidAudioReference(audio_url)) {
+        return res.status(400).json({message: "audio_url phải là HTTPS URL hoặc Cloudinary public ID hợp lệ"});
+    }
+
+    if (lyrics !== undefined && lyrics !== null && !isValidJsonValue(lyrics)) {
+        return res.status(400).json({message: "lyrics phải là JSON hợp lệ"});
     }
 
     next();

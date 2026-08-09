@@ -260,7 +260,7 @@ export const getListeningHistory = async (req: AuthenticatedRequest, res: Respon
 
         const history = historyRaw.map(item => ({
             ...item,
-            id: Number(item.id),
+            id: item.id.toString(),
             tracks: formatTrack(item.tracks)
         }));
 

@@ -11,7 +11,8 @@ export const convertToSlug = (text: string): string => {
 };
 
 export const generateUniqueGenreSlug = async (nameOrSlug: string, excludeId?: number): Promise<string> => {
-    const baseSlug = convertToSlug(nameOrSlug) || "genre";
+    const maxLength = 50;
+    const baseSlug = (convertToSlug(nameOrSlug) || "genre").slice(0, maxLength);
     let slug = baseSlug;
     let counter = 1;
 
@@ -24,7 +25,8 @@ export const generateUniqueGenreSlug = async (nameOrSlug: string, excludeId?: nu
             return slug;
         }
 
-        slug = `${baseSlug}-${counter}`;
+        const suffix = `-${counter}`;
+        slug = `${baseSlug.slice(0, maxLength - suffix.length)}${suffix}`;
         counter++;
     }
 };
