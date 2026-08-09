@@ -4,3 +4,5 @@
 /backend/generated/
 /api.md
 /backend/.env
+/POSTMAN.md
+/postman-collection.json
