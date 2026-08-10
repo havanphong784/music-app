@@ -1,11 +1,12 @@
 import axios from 'axios';
+import {getAccessToken, setAccessToken} from '../auth/accessToken';
 
 export const AUTH_UNAUTHORIZED_EVENT = 'auth:unauthorized';
 
 let refreshPromise: Promise<string> | null = null;
 
 const axiosClient = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1',
     headers: {
         'Content-Type': 'application/json',
     },
@@ -14,7 +15,7 @@ const axiosClient = axios.create({
 
 axiosClient.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
+        const token = getAccessToken();
         if (token) {
             config.headers['Authorization'] = `Bearer ${token}`;
         }
@@ -24,6 +25,28 @@ axiosClient.interceptors.request.use(
         return Promise.reject(error);
     }
 );
+
+export const refreshAccessToken = () => {
+    if (!refreshPromise) {
+        refreshPromise = axios.post(
+            `${axiosClient.defaults.baseURL}/auth/refresh`,
+            {},
+            {withCredentials: true}
+        ).then((response) => {
+            const token = response.data.token;
+            if (typeof token !== 'string' || !token) {
+                throw new Error('Refresh response does not contain an access token');
+            }
+
+            setAccessToken(token);
+            return token;
+        }).finally(() => {
+            refreshPromise = null;
+        });
+    }
+
+    return refreshPromise;
+};
 
 axiosClient.interceptors.response.use(
     (response) => {
@@ -35,29 +58,11 @@ axiosClient.interceptors.response.use(
             originalRequest._retry = true;
 
             try {
-                if (!refreshPromise) {
-                    refreshPromise = axios.post(
-                        `${axiosClient.defaults.baseURL}/auth/refresh`,
-                        {},
-                        {withCredentials: true}
-                    ).then((response) => {
-                        const token = response.data.token;
-                        if (typeof token !== 'string' || !token) {
-                            throw new Error('Refresh response does not contain an access token');
-                        }
-
-                        localStorage.setItem('token', token);
-                        return token;
-                    }).finally(() => {
-                        refreshPromise = null;
-                    });
-                }
-
-                const newAccessToken = await refreshPromise;
+                const newAccessToken = await refreshAccessToken();
                 originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
                 return axiosClient(originalRequest);
             } catch (refreshError) {
-                localStorage.removeItem('token');
+                setAccessToken(null);
                 window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
                 return Promise.reject(refreshError);
             }

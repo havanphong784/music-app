@@ -1,7 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
-import {createContext, useCallback, useContext, useEffect, useMemo, useState} from 'react';
 import type {ReactNode} from 'react';
-import axiosClient, {AUTH_UNAUTHORIZED_EVENT} from '../api/axiosClient';
+import {createContext, useCallback, useContext, useEffect, useMemo, useState} from 'react';
+import axiosClient, {AUTH_UNAUTHORIZED_EVENT, refreshAccessToken} from '../api/axiosClient';
+import {getAccessToken, setAccessToken} from '../auth/accessToken';
 
 export interface User {
     id: string;
@@ -28,7 +29,7 @@ export const AuthProvider = ({children}: { children: ReactNode }) => {
     const [isLoading, setIsLoading] = useState<boolean>(true);
 
     const login = useCallback((userData: User, token: string) => {
-        localStorage.setItem('token', token);
+        setAccessToken(token);
         setUser(userData);
     }, []);
 
@@ -38,25 +39,23 @@ export const AuthProvider = ({children}: { children: ReactNode }) => {
         } catch (error) {
             console.error('Lỗi khi đăng xuất:', error);
         } finally {
+            setAccessToken(null);
             setUser(null);
-            localStorage.removeItem('token');
         }
     }, []);
 
     const checkAuth = useCallback(async () => {
         setIsLoading(true);
-        const token = localStorage.getItem('token');
-        if (!token) {
-            setUser(null);
-            setIsLoading(false);
-            return;
-        }
 
         try {
-            const response = await axiosClient.get('/me');
+            if (!getAccessToken()) {
+                await refreshAccessToken();
+            }
+
+            const response = await axiosClient.get<{ user: User }>('/me');
             setUser(response.data.user);
-        } catch (error) {
-            console.error('Lỗi khi kiểm tra xác thực:', error);
+        } catch {
+            setAccessToken(null);
             setUser(null);
         } finally {
             setIsLoading(false);
@@ -76,7 +75,6 @@ export const AuthProvider = ({children}: { children: ReactNode }) => {
             setUser(null);
             setIsLoading(false);
         };
-
         window.addEventListener(AUTH_UNAUTHORIZED_EVENT, clearAuth);
         return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, clearAuth);
     }, []);
