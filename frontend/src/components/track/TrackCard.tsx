@@ -1,5 +1,6 @@
 import type {Track} from '../../types/track';
 import {usePlayer} from '../../contexts/PlayerContext';
+import {Link} from 'react-router-dom';
 
 export const TrackCard = ({track}: { track: Track }) => {
     const {play, currentTrack, isPlaying} = usePlayer();
@@ -10,7 +11,8 @@ export const TrackCard = ({track}: { track: Track }) => {
     const showPlaying = isCurrent && isPlaying;   // đang phát chính track này
 
     return (
-        <div className="group relative rounded-xl bg-white/5 p-3 transition hover:bg-white/10">
+        <Link to={`/track/${track.id}`}
+              className="group relative block rounded-xl bg-white/5 p-3 transition hover:bg-white/10">
             <div className="relative mb-3">
                 {cover ? (
                     <img src={cover} alt={track.title} className="aspect-square w-full rounded-lg object-cover"/>
@@ -27,7 +29,11 @@ export const TrackCard = ({track}: { track: Track }) => {
 
                 {/* Nút play overlay, hiện khi hover hoặc đang phát */}
                 <button
-                    onClick={() => play(track)}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        play(track);
+                    }}
                     className={`absolute bottom-2 right-2 flex h-12 w-12 items-center justify-center rounded-full bg-lime-400 text-zinc-950 shadow-lg transition hover:bg-lime-300 hover:scale-105 ${
                         showPlaying ? 'opacity-100' : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
                     }`}
@@ -48,6 +54,6 @@ export const TrackCard = ({track}: { track: Track }) => {
 
             <p className={`truncate font-medium ${showPlaying ? 'text-lime-400' : 'text-white'}`}>{track.title}</p>
             <p className="truncate text-sm text-zinc-400">{artists}</p>
-        </div>
+        </Link>
     );
 };
